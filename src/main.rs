@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod diff;
 pub mod event;
+pub mod git;
 pub mod log_io;
 pub mod summary;
 

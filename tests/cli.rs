@@ -257,3 +257,94 @@ fn ci_github_context_logs_allowlisted_environment() {
     assert!(raw.contains("GITHUB_RUN_ID"));
     assert!(!raw.contains("do-not-log"));
 }
+
+fn init_git_repo() -> tempfile::TempDir {
+    let dir = tempdir().unwrap();
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::fs::write(dir.path().join("README.md"), "hello").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "initial"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    dir
+}
+
+#[test]
+fn repo_snapshot_logs_git_status() {
+    let repo = init_git_repo();
+    let file = repo.path().join("events.jsonl");
+    std::fs::write(repo.path().join("README.md"), "hello world").unwrap();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "repo",
+            "snapshot",
+            "--cwd",
+            repo.path().to_str().unwrap(),
+            "--file",
+            file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    let stored: Value = serde_json::from_str(raw.trim()).unwrap();
+    assert_eq!(stored["event"], "repo.snapshot");
+    assert_eq!(stored["body"]["dirty"], true);
+    assert_eq!(stored["body"]["files"][0]["path"], "README.md");
+}
+
+#[test]
+fn repo_diff_logs_stat_and_patch() {
+    let repo = init_git_repo();
+    let file = repo.path().join("events.jsonl");
+    std::fs::write(repo.path().join("README.md"), "hello world").unwrap();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "repo",
+            "diff",
+            "--cwd",
+            repo.path().to_str().unwrap(),
+            "--file",
+            file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    let stored: Value = serde_json::from_str(raw.trim()).unwrap();
+    assert_eq!(stored["event"], "repo.diff");
+    assert!(
+        stored["body"]["stat"]
+            .as_str()
+            .unwrap()
+            .contains("README.md")
+    );
+    assert!(
+        stored["body"]["patch"]
+            .as_str()
+            .unwrap()
+            .contains("hello world")
+    );
+}

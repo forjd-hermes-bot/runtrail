@@ -1,5 +1,6 @@
 use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
+use crate::git;
 use crate::log_io::{append_event, next_seq, read_events, validate_file};
 use crate::summary::{Summary, format_level};
 use anyhow::{Context, Result, anyhow};
@@ -31,6 +32,45 @@ enum Commands {
     Diff(DiffArgs),
     /// CI helpers.
     Ci(CiArgs),
+    /// Git repository helpers.
+    Repo(RepoArgs),
+}
+
+#[derive(Debug, Parser)]
+struct RepoArgs {
+    #[command(subcommand)]
+    command: RepoCommands,
+}
+
+#[derive(Debug, Subcommand)]
+enum RepoCommands {
+    /// Log current git status and metadata.
+    Snapshot(RepoSnapshotArgs),
+    /// Log current git diff metadata and optional patch.
+    Diff(RepoDiffArgs),
+}
+
+#[derive(Debug, Parser)]
+struct RepoSnapshotArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+    /// Repository working directory.
+    #[arg(long, default_value = ".")]
+    cwd: PathBuf,
+}
+
+#[derive(Debug, Parser)]
+struct RepoDiffArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+    /// Repository working directory.
+    #[arg(long, default_value = ".")]
+    cwd: PathBuf,
+    /// Omit full patch and record only diff --stat.
+    #[arg(long)]
+    stat_only: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -154,6 +194,7 @@ pub fn run() -> Result<()> {
         Commands::Summarise(args) => summarise(args),
         Commands::Diff(args) => diff(args),
         Commands::Ci(args) => ci(args),
+        Commands::Repo(args) => repo(args),
     }
 }
 
@@ -248,6 +289,51 @@ fn ci(args: CiArgs) -> Result<()> {
     match args.command {
         CiCommands::GithubContext(args) => github_context(args),
     }
+}
+
+fn repo(args: RepoArgs) -> Result<()> {
+    match args.command {
+        RepoCommands::Snapshot(args) => repo_snapshot(args),
+        RepoCommands::Diff(args) => repo_diff(args),
+    }
+}
+
+fn repo_snapshot(args: RepoSnapshotArgs) -> Result<()> {
+    let seq = next_seq(&args.file)
+        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
+    let body = git::snapshot_body(&args.cwd)?;
+    append_new_event(AppendNewEvent {
+        file: &args.file,
+        seq,
+        name: "repo.snapshot".to_string(),
+        level: Level::Info,
+        src: Some("git".to_string()),
+        attrs: Map::new(),
+        body,
+        trace_id: None,
+        span_id: None,
+        parent_span_id: None,
+        duration_ms: None,
+    })
+}
+
+fn repo_diff(args: RepoDiffArgs) -> Result<()> {
+    let seq = next_seq(&args.file)
+        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
+    let body = git::diff_body(&args.cwd, args.stat_only)?;
+    append_new_event(AppendNewEvent {
+        file: &args.file,
+        seq,
+        name: "repo.diff".to_string(),
+        level: Level::Info,
+        src: Some("git".to_string()),
+        attrs: Map::new(),
+        body,
+        trace_id: None,
+        span_id: None,
+        parent_span_id: None,
+        duration_ms: None,
+    })
 }
 
 fn github_context(args: CiGithubContextArgs) -> Result<()> {
