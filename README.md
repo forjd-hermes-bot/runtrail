@@ -163,6 +163,14 @@ This records only a safe allowlist of environment variables:
 - `RUNNER_OS`
 - `RUNNER_ARCH`
 
+### Generate shell completions
+
+```bash
+cel completions bash > cel.bash
+cel completions zsh > _cel
+cel completions fish > cel.fish
+```
+
 ## Example event types
 
 ```bash

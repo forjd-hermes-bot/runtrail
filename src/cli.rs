@@ -6,9 +6,11 @@ use crate::log_io::{append_event, next_seq, read_events, validate_file};
 use crate::repair;
 use crate::summary::{Summary, format_level};
 use anyhow::{Context, Result, anyhow};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{Shell, generate};
 use serde_json::{Map, Value, json};
 use std::env;
+use std::io;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_LOG_FILE: &str = ".compact-event-log/events.jsonl";
@@ -40,6 +42,15 @@ enum Commands {
     Run(RunArgs),
     /// Generate an agent-ready repair prompt from an event log.
     RepairPrompt(RepairPromptArgs),
+    /// Generate shell completion scripts.
+    Completions(CompletionsArgs),
+}
+
+#[derive(Debug, Parser)]
+struct CompletionsArgs {
+    /// Shell to generate completions for.
+    #[arg(value_enum)]
+    shell: Shell,
 }
 
 #[derive(Debug, Parser)]
@@ -226,7 +237,14 @@ pub fn run() -> Result<()> {
         Commands::Repo(args) => repo(args),
         Commands::Run(args) => run_command(args),
         Commands::RepairPrompt(args) => repair_prompt(args),
+        Commands::Completions(args) => completions(args),
     }
+}
+
+fn completions(args: CompletionsArgs) -> Result<()> {
+    let mut command = Cli::command();
+    generate(args.shell, &mut command, "cel", &mut io::stdout());
+    Ok(())
 }
 
 fn log(args: LogArgs) -> Result<()> {

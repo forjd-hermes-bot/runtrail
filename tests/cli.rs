@@ -436,3 +436,13 @@ fn repair_prompt_outputs_agent_ready_markdown() {
         .stdout(predicate::str::contains("Safe Commands To Try"))
         .stdout(predicate::str::contains("boom"));
 }
+
+#[test]
+fn completions_generates_shell_script() {
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_cel"));
+}
