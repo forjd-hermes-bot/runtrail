@@ -1,5 +1,6 @@
 use crate::event::{Event, Level, NewEvent};
 use crate::log_io::{append_event, next_seq, read_events, validate_file};
+use crate::summary::{Summary, format_level};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value, json};
@@ -22,6 +23,18 @@ enum Commands {
     Tail(TailArgs),
     /// Validate a JSONL event log.
     Validate(FileArg),
+    /// Summarise an event log as Markdown.
+    Summarise(SummariseArgs),
+}
+
+#[derive(Debug, Parser)]
+struct SummariseArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+    /// Number of recent events to include.
+    #[arg(long, default_value_t = 5)]
+    recent: usize,
 }
 
 #[derive(Debug, Parser)]
@@ -105,6 +118,7 @@ pub fn run() -> Result<()> {
         Commands::Log(args) => log(args),
         Commands::Tail(args) => tail(args),
         Commands::Validate(args) => validate(&args.file),
+        Commands::Summarise(args) => summarise(args),
     }
 }
 
@@ -139,11 +153,21 @@ fn tail(args: TailArgs) -> Result<()> {
             println!("{}", serde_json::to_string(event)?);
         } else {
             println!(
-                "{} {} {:?} {}",
-                event.seq, event.ts, event.level, event.event
+                "{} {} {} {}",
+                event.seq,
+                event.ts,
+                format_level(&event.level),
+                event.event
             );
         }
     }
+    Ok(())
+}
+
+fn summarise(args: SummariseArgs) -> Result<()> {
+    let events = read_events(&args.file)?;
+    let summary = Summary::from_events(&events, args.recent);
+    print!("{}", summary.to_markdown());
     Ok(())
 }
 

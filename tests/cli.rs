@@ -150,3 +150,46 @@ fn validate_reports_valid_and_invalid_logs() {
         .failure()
         .stderr(predicate::str::contains("line 1"));
 }
+
+#[test]
+fn summarise_outputs_counts_warnings_and_recent_events() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            file.to_str().unwrap(),
+            "--event",
+            "agent.note",
+            "--message",
+            "hello",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            file.to_str().unwrap(),
+            "--event",
+            "error",
+            "--level",
+            "error",
+            "--body",
+            r#"{"error":"boom"}"#,
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["summarise", "--file", file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Total events: 2"))
+        .stdout(predicate::str::contains("`error`: 1"))
+        .stdout(predicate::str::contains("boom"));
+}
