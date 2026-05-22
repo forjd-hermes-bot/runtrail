@@ -236,3 +236,24 @@ fn diff_outputs_added_removed_and_new_errors() {
         .stdout(predicate::str::contains("New warnings and errors"))
         .stdout(predicate::str::contains("boom"));
 }
+
+#[test]
+fn ci_github_context_logs_allowlisted_environment() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    let mut cmd = Command::cargo_bin("cel").unwrap();
+    cmd.args(["ci", "github-context", "--file", file.to_str().unwrap()])
+        .env("GITHUB_RUN_ID", "123")
+        .env("GITHUB_RUN_ATTEMPT", "2")
+        .env("GITHUB_WORKFLOW", "CI")
+        .env("GITHUB_SHA", "abc123")
+        .env("GITHUB_REPOSITORY", "owner/repo")
+        .env("SECRET_TOKEN", "do-not-log")
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    assert!(raw.contains("ci.github.context"));
+    assert!(raw.contains("GITHUB_RUN_ID"));
+    assert!(!raw.contains("do-not-log"));
+}

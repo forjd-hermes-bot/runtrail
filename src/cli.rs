@@ -2,10 +2,10 @@ use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
 use crate::log_io::{append_event, next_seq, read_events, validate_file};
 use crate::summary::{Summary, format_level};
-
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value, json};
+use std::env;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_LOG_FILE: &str = ".compact-event-log/events.jsonl";
@@ -29,6 +29,27 @@ enum Commands {
     Summarise(SummariseArgs),
     /// Compare two event logs.
     Diff(DiffArgs),
+    /// CI helpers.
+    Ci(CiArgs),
+}
+
+#[derive(Debug, Parser)]
+struct CiArgs {
+    #[command(subcommand)]
+    command: CiCommands,
+}
+
+#[derive(Debug, Subcommand)]
+enum CiCommands {
+    /// Capture safe GitHub Actions environment context.
+    GithubContext(CiGithubContextArgs),
+}
+
+#[derive(Debug, Parser)]
+struct CiGithubContextArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
 }
 
 #[derive(Debug, Parser)]
@@ -132,6 +153,7 @@ pub fn run() -> Result<()> {
         Commands::Validate(args) => validate(&args.file),
         Commands::Summarise(args) => summarise(args),
         Commands::Diff(args) => diff(args),
+        Commands::Ci(args) => ci(args),
     }
 }
 
@@ -140,9 +162,10 @@ fn log(args: LogArgs) -> Result<()> {
         .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     let attrs = parse_attrs(&args.attrs)?;
     let body = parse_body(args.body.as_deref(), args.message.as_deref())?;
-    let event = Event::new(NewEvent {
+    append_new_event(AppendNewEvent {
+        file: &args.file,
         seq,
-        event: args.event,
+        name: args.event,
         level: args.level.into(),
         src: Some(args.src),
         attrs,
@@ -151,9 +174,38 @@ fn log(args: LogArgs) -> Result<()> {
         span_id: args.span_id,
         parent_span_id: args.parent_span_id,
         duration_ms: args.duration_ms,
+    })
+}
+
+struct AppendNewEvent<'a> {
+    file: &'a Path,
+    seq: u64,
+    name: String,
+    level: Level,
+    src: Option<String>,
+    attrs: Map<String, Value>,
+    body: Value,
+    trace_id: Option<String>,
+    span_id: Option<String>,
+    parent_span_id: Option<String>,
+    duration_ms: Option<u64>,
+}
+
+fn append_new_event(args: AppendNewEvent<'_>) -> Result<()> {
+    let event = Event::new(NewEvent {
+        seq: args.seq,
+        event: args.name,
+        level: args.level,
+        src: args.src,
+        attrs: args.attrs,
+        body: args.body,
+        trace_id: args.trace_id,
+        span_id: args.span_id,
+        parent_span_id: args.parent_span_id,
+        duration_ms: args.duration_ms,
     });
     event.validate().map_err(|message| anyhow!(message))?;
-    append_event(&args.file, &event)?;
+    append_event(args.file, &event)?;
     println!("{}", serde_json::to_string(&event)?);
     Ok(())
 }
@@ -191,6 +243,52 @@ fn diff(args: DiffArgs) -> Result<()> {
     print!("{}", diff.to_markdown());
     Ok(())
 }
+
+fn ci(args: CiArgs) -> Result<()> {
+    match args.command {
+        CiCommands::GithubContext(args) => github_context(args),
+    }
+}
+
+fn github_context(args: CiGithubContextArgs) -> Result<()> {
+    let seq = next_seq(&args.file)
+        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
+    let mut attrs = Map::new();
+    for key in GITHUB_ENV_ALLOWLIST {
+        if let Ok(value) = env::var(key) {
+            attrs.insert((*key).to_string(), Value::String(value));
+        }
+    }
+    append_new_event(AppendNewEvent {
+        file: &args.file,
+        seq,
+        name: "ci.github.context".to_string(),
+        level: Level::Info,
+        src: Some("github-actions".to_string()),
+        attrs,
+        body: Value::Object(Map::new()),
+        trace_id: None,
+        span_id: None,
+        parent_span_id: None,
+        duration_ms: None,
+    })
+}
+
+const GITHUB_ENV_ALLOWLIST: &[&str] = &[
+    "GITHUB_WORKFLOW",
+    "GITHUB_RUN_ID",
+    "GITHUB_RUN_NUMBER",
+    "GITHUB_RUN_ATTEMPT",
+    "GITHUB_JOB",
+    "GITHUB_ACTION",
+    "GITHUB_ACTOR",
+    "GITHUB_EVENT_NAME",
+    "GITHUB_REF",
+    "GITHUB_SHA",
+    "GITHUB_REPOSITORY",
+    "RUNNER_OS",
+    "RUNNER_ARCH",
+];
 
 fn validate(path: &Path) -> Result<()> {
     let issues = validate_file(path);
