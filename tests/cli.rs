@@ -8,7 +8,7 @@ fn log_message_appends_event_and_prints_json() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
 
-    let output = Command::cargo_bin("cel")
+    let output = Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -39,7 +39,7 @@ fn log_parses_attrs_and_body_json() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("nested/events.jsonl");
 
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -66,7 +66,7 @@ fn log_parses_attrs_and_body_json() {
 
 #[test]
 fn log_requires_event_name() {
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .arg("log")
         .assert()
@@ -79,7 +79,7 @@ fn tail_shows_recent_events_as_json() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
     for idx in 0..3 {
-        Command::cargo_bin("cel")
+        Command::cargo_bin("runtrail")
             .unwrap()
             .args([
                 "log",
@@ -94,7 +94,7 @@ fn tail_shows_recent_events_as_json() {
             .success();
     }
 
-    let output = Command::cargo_bin("cel")
+    let output = Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "tail",
@@ -123,7 +123,7 @@ fn tail_shows_recent_events_as_json() {
 fn validate_reports_valid_and_invalid_logs() {
     let dir = tempdir().unwrap();
     let good = dir.path().join("good.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -134,7 +134,7 @@ fn validate_reports_valid_and_invalid_logs() {
         ])
         .assert()
         .success();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["validate", "--file", good.to_str().unwrap()])
         .assert()
@@ -143,7 +143,7 @@ fn validate_reports_valid_and_invalid_logs() {
 
     let bad = dir.path().join("bad.jsonl");
     std::fs::write(&bad, "{nope}\n").unwrap();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["validate", "--file", bad.to_str().unwrap()])
         .assert()
@@ -155,7 +155,7 @@ fn validate_reports_valid_and_invalid_logs() {
 fn summarise_outputs_counts_warnings_and_recent_events() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -168,7 +168,7 @@ fn summarise_outputs_counts_warnings_and_recent_events() {
         ])
         .assert()
         .success();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -184,7 +184,7 @@ fn summarise_outputs_counts_warnings_and_recent_events() {
         .assert()
         .success();
 
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["summarise", "--file", file.to_str().unwrap()])
         .assert()
@@ -199,7 +199,7 @@ fn diff_outputs_added_removed_and_new_errors() {
     let dir = tempdir().unwrap();
     let before = dir.path().join("before.jsonl");
     let after = dir.path().join("after.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -211,7 +211,7 @@ fn diff_outputs_added_removed_and_new_errors() {
         .assert()
         .success();
     std::fs::copy(&before, &after).unwrap();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "log",
@@ -227,7 +227,7 @@ fn diff_outputs_added_removed_and_new_errors() {
         .assert()
         .success();
 
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["diff", before.to_str().unwrap(), after.to_str().unwrap()])
         .assert()
@@ -241,7 +241,7 @@ fn diff_outputs_added_removed_and_new_errors() {
 fn ci_github_context_logs_allowlisted_environment() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
-    let mut cmd = Command::cargo_bin("cel").unwrap();
+    let mut cmd = Command::cargo_bin("runtrail").unwrap();
     cmd.args(["ci", "github-context", "--file", file.to_str().unwrap()])
         .env("GITHUB_RUN_ID", "123")
         .env("GITHUB_RUN_ATTEMPT", "2")
@@ -294,7 +294,7 @@ fn repo_snapshot_logs_git_status() {
     let repo = init_git_repo();
     let file = repo.path().join("events.jsonl");
     std::fs::write(repo.path().join("README.md"), "hello world").unwrap();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "repo",
@@ -319,7 +319,7 @@ fn repo_diff_logs_stat_and_patch() {
     let repo = init_git_repo();
     let file = repo.path().join("events.jsonl");
     std::fs::write(repo.path().join("README.md"), "hello world").unwrap();
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "repo",
@@ -353,7 +353,7 @@ fn repo_diff_logs_stat_and_patch() {
 fn run_command_logs_start_and_end_events() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "run",
@@ -384,7 +384,7 @@ fn run_command_logs_start_and_end_events() {
 fn run_command_returns_child_exit_code_and_logs_error() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "run",
@@ -410,7 +410,7 @@ fn run_command_returns_child_exit_code_and_logs_error() {
 fn repair_prompt_outputs_agent_ready_markdown() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args([
             "run",
@@ -426,7 +426,7 @@ fn repair_prompt_outputs_agent_ready_markdown() {
         .assert()
         .code(2);
 
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["repair-prompt", "--file", file.to_str().unwrap()])
         .assert()
@@ -439,10 +439,10 @@ fn repair_prompt_outputs_agent_ready_markdown() {
 
 #[test]
 fn completions_generates_shell_script() {
-    Command::cargo_bin("cel")
+    Command::cargo_bin("runtrail")
         .unwrap()
         .args(["completions", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("_cel"));
+        .stdout(predicate::str::contains("_runtrail"));
 }

@@ -1,13 +1,13 @@
 [package]
-name = "compact-event-log"
+name = "runtrail"
 version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A tiny JSONL-first event log for agent, browser QA, repo, and CI workflows"
-repository = "https://github.com/forjd-hermes-bot/compact-event-log"
+repository = "https://github.com/forjd-hermes-bot/runtrail"
 
 [[bin]]
-name = "cel"
+name = "runtrail"
 path = "src/main.rs"
 
 [dependencies]

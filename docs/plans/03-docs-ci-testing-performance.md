@@ -33,7 +33,7 @@
 - Modify: `tests/cli.rs`
 
 **Steps:**
-1. Write failing CLI tests that set `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_WORKFLOW`, `GITHUB_SHA`, and `GITHUB_REPOSITORY`, then run `cel ci github-context`.
+1. Write failing CLI tests that set `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_WORKFLOW`, `GITHUB_SHA`, and `GITHUB_REPOSITORY`, then run `runtrail ci github-context`.
 2. Confirm failure.
 3. Implement nested `ci github-context` command that reads a safe allowlist of GitHub/runner env vars and appends an event.
 4. Run tests.
@@ -48,7 +48,7 @@
 - Modify: `README.md`
 
 **Steps:**
-1. Write a shell script that builds release, generates a temp 10k-event log with `cel log`, then times `validate` and `summarise`.
+1. Write a shell script that builds release, generates a temp 10k-event log with `runtrail log`, then times `validate` and `summarise`.
 2. Avoid requiring `hyperfine`; use `/usr/bin/time` or shell timestamps.
 3. Run the script and record expectations in README.
 4. Commit: `test: add performance smoke script`.

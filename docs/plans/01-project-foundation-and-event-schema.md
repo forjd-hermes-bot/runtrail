@@ -2,7 +2,7 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Build the Rust crate foundation, event model, validation, JSONL IO, and basic `cel log` command.
+**Goal:** Build the Rust crate foundation, event model, validation, JSONL IO, and basic `runtrail log` command.
 
 **Architecture:** Keep the event envelope in `src/event.rs`, file append/read behavior in `src/log_io.rs`, and CLI parsing in `src/cli.rs`. The CLI writes one compact JSON object per line and prints the appended event.
 
@@ -12,14 +12,14 @@
 
 ### Task 1: Configure crate metadata and dependencies
 
-**Objective:** Set up the package as a `cel` binary with the dependencies needed for the MVP.
+**Objective:** Set up the package as a `runtrail` binary with the dependencies needed for the MVP.
 
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `README.md`
 
 **Steps:**
-1. Update package metadata: name `compact-event-log`, binary name `cel`, license `MIT`, description.
+1. Update package metadata: name `runtrail`, binary name `runtrail`, license `MIT`, description.
 2. Add runtime dependencies: `anyhow`, `clap` with derive, `serde`, `serde_json`, `thiserror`, `time` with formatting/parsing/macros, `ulid` with serde, and `hex` or equivalent if needed.
 3. Add dev dependencies: `assert_cmd`, `predicates`, `tempfile`.
 4. Run `cargo check`.
@@ -57,7 +57,7 @@
 5. Run tests.
 6. Commit: `feat: add jsonl log storage`.
 
-### Task 4: Implement `cel log`
+### Task 4: Implement `runtrail log`
 
 **Objective:** Expose event appending through a CLI command.
 
@@ -67,7 +67,7 @@
 - Create/modify: `tests/cli.rs`
 
 **Steps:**
-1. Write failing CLI integration tests for `cel log --event agent.note --message hello`, `--attr key=value`, `--body '{"x":1}'`, and parent directory creation.
+1. Write failing CLI integration tests for `runtrail log --event agent.note --message hello`, `--attr key=value`, `--body '{"x":1}'`, and parent directory creation.
 2. Run tests and confirm they fail.
 3. Implement `clap` parser and `Log` subcommand.
 4. Parse attr values as JSON if possible, otherwise strings.

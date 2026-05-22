@@ -2,7 +2,7 @@
 
 ## Summary
 
-`compact-event-log` should use a JSONL-first append-only stream with a small, stable event envelope. The strongest external alignment points are JSON Lines/NDJSON for framing, event sourcing for immutability and replay, OpenTelemetry for structured observability vocabulary, W3C Trace Context for correlation, CloudEvents for portable event-envelope concepts, GitHub Actions contexts for CI evidence, and LLM observability platforms for agent/tool-call event shapes.
+`runtrail` should use a JSONL-first append-only stream with a small, stable event envelope. The strongest external alignment points are JSON Lines/NDJSON for framing, event sourcing for immutability and replay, OpenTelemetry for structured observability vocabulary, W3C Trace Context for correlation, CloudEvents for portable event-envelope concepts, GitHub Actions contexts for CI evidence, and LLM observability platforms for agent/tool-call event shapes.
 
 ## Sources
 
@@ -46,11 +46,11 @@ Design implications:
 
 ## OpenTelemetry logs
 
-OpenTelemetry log records include timestamp, observed timestamp, trace ID, span ID, severity, body, attributes, resource, instrumentation scope, and event name. `compact-event-log` does not need to implement OTLP, but the vocabulary is useful.
+OpenTelemetry log records include timestamp, observed timestamp, trace ID, span ID, severity, body, attributes, resource, instrumentation scope, and event name. `runtrail` does not need to implement OTLP, but the vocabulary is useful.
 
 Recommended compact mapping:
 
-| compact-event-log | OpenTelemetry concept |
+| runtrail | OpenTelemetry concept |
 | --- | --- |
 | `ts` | `Timestamp` |
 | `event` | `EventName` |

@@ -13,10 +13,10 @@ use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const DEFAULT_LOG_FILE: &str = ".compact-event-log/events.jsonl";
+const DEFAULT_LOG_FILE: &str = ".runtrail/events.jsonl";
 
 #[derive(Debug, Parser)]
-#[command(name = "cel", version, about = "Compact JSONL event logs")]
+#[command(name = "runtrail", version, about = "Compact JSONL event logs")]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -182,7 +182,7 @@ struct LogArgs {
     #[arg(long, default_value = "info")]
     level: LevelArg,
     /// Event source.
-    #[arg(long, default_value = "cel")]
+    #[arg(long, default_value = "runtrail")]
     src: String,
     /// Attribute as key=value. Values are parsed as JSON when possible.
     #[arg(long = "attr")]
@@ -243,7 +243,7 @@ pub fn run() -> Result<()> {
 
 fn completions(args: CompletionsArgs) -> Result<()> {
     let mut command = Cli::command();
-    generate(args.shell, &mut command, "cel", &mut io::stdout());
+    generate(args.shell, &mut command, "runtrail", &mut io::stdout());
     Ok(())
 }
 
@@ -402,7 +402,7 @@ fn run_command(args: RunArgs) -> Result<()> {
         seq: start_seq,
         name: "command.start".to_string(),
         level: Level::Info,
-        src: Some("cel".to_string()),
+        src: Some("runtrail".to_string()),
         attrs: attrs.clone(),
         body: result.start_body,
         trace_id: None,
@@ -419,7 +419,7 @@ fn run_command(args: RunArgs) -> Result<()> {
         } else {
             Level::Error
         },
-        src: Some("cel".to_string()),
+        src: Some("runtrail".to_string()),
         attrs,
         body: result.end_body,
         trace_id: None,

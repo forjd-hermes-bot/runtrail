@@ -45,7 +45,7 @@ impl LogDiff {
 
     pub fn to_markdown(&self) -> String {
         let mut out = String::new();
-        out.push_str("# compact-event-log diff\n\n");
+        out.push_str("# runtrail diff\n\n");
         out.push_str(&format!("- Before events: {}\n", self.before_total));
         out.push_str(&format!("- After events: {}\n", self.after_total));
         out.push_str(&format!(

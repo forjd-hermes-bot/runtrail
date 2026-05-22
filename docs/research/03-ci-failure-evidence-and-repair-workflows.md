@@ -2,7 +2,7 @@
 
 ## Summary
 
-The adjacent CI-fixture idea informs `compact-event-log`: CI failures become more useful for agents when workflow metadata, environment expectations, failing logs, changed files, dependency metadata, and safe local replay commands are captured in a portable bundle. `compact-event-log` should provide the event trail that such a bundle can embed or reference.
+The adjacent CI-fixture idea informs `runtrail`: CI failures become more useful for agents when workflow metadata, environment expectations, failing logs, changed files, dependency metadata, and safe local replay commands are captured in a portable bundle. `runtrail` should provide the event trail that such a bundle can embed or reference.
 
 ## Sources
 
@@ -68,7 +68,7 @@ These map cleanly into `attrs`:
 
 ## Workflow commands and annotations
 
-GitHub supports annotations such as `::error file=app.js,line=1::Missing semicolon`, grouped logs, environment files, outputs, and `GITHUB_STEP_SUMMARY`. `compact-event-log` can record these as structured events:
+GitHub supports annotations such as `::error file=app.js,line=1::Missing semicolon`, grouped logs, environment files, outputs, and `GITHUB_STEP_SUMMARY`. `runtrail` can record these as structured events:
 
 - `ci.annotation.error`
 - `ci.annotation.warning`
@@ -113,9 +113,9 @@ Agent-ready repair prompts should be evidence-first and avoid unsafe commands. A
 6. Safe commands to try locally.
 7. Explicit constraints: do not push secrets, do not rewrite unrelated files, keep changes minimal.
 
-`compact-event-log summarise` can output a Markdown summary that later becomes part of such a prompt.
+`runtrail summarise` can output a Markdown summary that later becomes part of such a prompt.
 
-## MVP implications for compact-event-log
+## MVP implications for runtrail
 
 The event-log MVP should include enough primitives to support CI evidence bundles later:
 

@@ -24,20 +24,20 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: cel-x86_64-unknown-linux-gnu.tar.gz
+            artifact: runtrail-x86_64-unknown-linux-gnu.tar.gz
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact: cel-aarch64-unknown-linux-gnu.tar.gz
+            artifact: runtrail-aarch64-unknown-linux-gnu.tar.gz
             cross: true
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: cel-x86_64-apple-darwin.tar.gz
+            artifact: runtrail-x86_64-apple-darwin.tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: cel-aarch64-apple-darwin.tar.gz
+            artifact: runtrail-aarch64-apple-darwin.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: cel-x86_64-pc-windows-msvc.zip
+            artifact: runtrail-x86_64-pc-windows-msvc.zip
 
     steps:
       - name: Checkout
@@ -75,17 +75,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/cel" dist/cel
-          chmod +x dist/cel
-          tar -C dist -czf "${{ matrix.artifact }}" cel
+          cp "target/${{ matrix.target }}/release/runtrail" dist/runtrail
+          chmod +x dist/runtrail
+          tar -C dist -czf "${{ matrix.artifact }}" runtrail
 
       - name: Package Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "target/${{ matrix.target }}/release/cel.exe" dist/cel.exe
-          Compress-Archive -Path dist/cel.exe -DestinationPath "${{ matrix.artifact }}" -Force
+          Copy-Item "target/${{ matrix.target }}/release/runtrail.exe" dist/runtrail.exe
+          Compress-Archive -Path dist/runtrail.exe -DestinationPath "${{ matrix.artifact }}" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

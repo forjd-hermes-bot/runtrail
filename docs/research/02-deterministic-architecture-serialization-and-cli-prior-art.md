@@ -38,7 +38,7 @@ Relevant concepts:
 
 Design implications:
 
-- Treat `compact-event-log` as a black-box recorder and not a mutable state database.
+- Treat `runtrail` as a black-box recorder and not a mutable state database.
 - Include stable ordering: `seq` plus timestamp.
 - Include source and actor metadata.
 - Include causality links: `parent_id`, trace/span fields, or both.

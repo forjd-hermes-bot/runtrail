@@ -1,8 +1,8 @@
-# compact-event-log MVP Specification
+# runtrail MVP Specification
 
 ## Pitch
 
-`compact-event-log` (`cel`) is a tiny Rust CLI and JSONL event format for recording agent actions, browser QA steps, repository changes, command/test results, notes, and CI events in one local, portable, diffable stream.
+`runtrail` (`runtrail`) is a tiny Rust CLI and JSONL event format for recording agent actions, browser QA steps, repository changes, command/test results, notes, and CI events in one local, portable, diffable stream.
 
 ## Goals
 
@@ -23,8 +23,8 @@
 
 ## Package and binary
 
-- Crate name: `compact-event-log`
-- Binary name: `cel`
+- Crate name: `runtrail`
+- Binary name: `runtrail`
 - Language: Rust 2021/2024-compatible edition selected by Cargo.
 
 ## Event schema v1
@@ -42,7 +42,7 @@ Required fields:
 Recommended fields:
 
 - `level`: `trace`, `debug`, `info`, `warn`, or `error`; default `info`.
-- `src`: source string, e.g. `cel`, `hermes-agent`, `github-actions`.
+- `src`: source string, e.g. `runtrail`, `hermes-agent`, `github-actions`.
 - `attrs`: object containing string keys and JSON scalar/object/array values.
 - `body`: event-specific JSON value, usually object.
 
@@ -79,7 +79,7 @@ The CLI must accept arbitrary event names, not only built-ins.
 
 ## CLI commands
 
-### `cel log`
+### `runtrail log`
 
 Append an event to a JSONL log file.
 
@@ -89,9 +89,9 @@ Required option:
 
 Common options:
 
-- `--file <path>`: default `.compact-event-log/events.jsonl`.
+- `--file <path>`: default `.runtrail/events.jsonl`.
 - `--level <level>`: default `info`.
-- `--src <source>`: default `cel`.
+- `--src <source>`: default `runtrail`.
 - `--attr key=value`: repeatable, parses values as JSON when possible, otherwise string.
 - `--body <json>`: JSON body value; default `{}`.
 - `--message <text>`: shorthand body `{ "message": text }` unless `--body` is supplied.
@@ -105,23 +105,23 @@ Behavior:
 - Append one compact JSON object plus newline.
 - Print the event JSON to stdout.
 
-### `cel tail`
+### `runtrail tail`
 
 Show recent events.
 
 Options:
 
-- `--file <path>` default `.compact-event-log/events.jsonl`.
+- `--file <path>` default `.runtrail/events.jsonl`.
 - `--lines <n>` default `20`.
 - `--json`: print raw JSONL records instead of human text.
 
-### `cel summarise`
+### `runtrail summarise`
 
 Summarise a log for humans/agents.
 
 Options:
 
-- `--file <path>` default `.compact-event-log/events.jsonl`.
+- `--file <path>` default `.runtrail/events.jsonl`.
 - `--markdown`: output Markdown; default true for MVP.
 
 Summary content:
@@ -133,7 +133,7 @@ Summary content:
 - Error/warn events with short previews.
 - Recent events.
 
-### `cel diff`
+### `runtrail diff`
 
 Compare two event logs.
 
@@ -149,7 +149,7 @@ Output:
 - Removed events by ID.
 - New warn/error events.
 
-### `cel validate`
+### `runtrail validate`
 
 Validate a JSONL event log.
 

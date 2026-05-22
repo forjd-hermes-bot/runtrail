@@ -4,8 +4,7 @@ use serde_json::Value;
 pub fn repair_prompt(events: &[Event]) -> String {
     let mut output = String::new();
     output.push_str("# Agent Repair Prompt\n\n");
-    output
-        .push_str("You are repairing a failing local/CI run using compact-event-log evidence.\n\n");
+    output.push_str("You are repairing a failing local/CI run using runtrail evidence.\n\n");
     output.push_str("## Failure Evidence\n\n");
     let failures: Vec<&Event> = events
         .iter()
@@ -36,7 +35,7 @@ pub fn repair_prompt(events: &[Event]) -> String {
         output.push_str(&format_repo_snapshot(&repo.body));
     } else {
         output.push_str(
-            "No `repo.snapshot` event found. Run `cel repo snapshot` if repo context is needed.\n",
+            "No `repo.snapshot` event found. Run `runtrail repo snapshot` if repo context is needed.\n",
         );
     }
 
@@ -66,8 +65,8 @@ pub fn repair_prompt(events: &[Event]) -> String {
 
     output.push_str("\n## Safe Commands To Try\n\n");
     output.push_str("```bash\n");
-    output.push_str("cel summarise --file .compact-event-log/events.jsonl\n");
-    output.push_str("cel tail --file .compact-event-log/events.jsonl --lines 20\n");
+    output.push_str("runtrail summarise --file .runtrail/events.jsonl\n");
+    output.push_str("runtrail tail --file .runtrail/events.jsonl --lines 20\n");
     output.push_str("cargo fmt --check\n");
     output.push_str("cargo clippy --all-targets -- -D warnings\n");
     output.push_str("cargo test\n");
@@ -79,7 +78,7 @@ pub fn repair_prompt(events: &[Event]) -> String {
     output.push_str("3. Make the smallest safe fix.\n");
     output.push_str("4. Re-run the failing command and then the full quality gate.\n");
     output.push_str(
-        "5. Log follow-up evidence with `cel run`, `cel repo snapshot`, or `cel repo diff`.\n",
+        "5. Log follow-up evidence with `runtrail run`, `runtrail repo snapshot`, or `runtrail repo diff`.\n",
     );
     output
 }
@@ -137,7 +136,7 @@ mod tests {
             seq: 1,
             event: "command.end".to_string(),
             level: Level::Error,
-            src: Some("cel".to_string()),
+            src: Some("runtrail".to_string()),
             attrs: Map::new(),
             body: json!({"cmd":["cargo","test"],"exit_code":101,"stderr_preview":"boom"}),
             trace_id: None,

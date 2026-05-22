@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${CEL_INSTALL_REPO:-forjd-hermes-bot/compact-event-log}"
-TAG="${CEL_INSTALL_TAG:-latest}"
-BIN="cel"
-INSTALL_DIR="${CEL_INSTALL_DIR:-${HOME}/.local/bin}"
+REPO="${RUNTRAIL_INSTALL_REPO:-forjd-hermes-bot/runtrail}"
+TAG="${RUNTRAIL_INSTALL_TAG:-latest}"
+BIN="runtrail"
+INSTALL_DIR="${RUNTRAIL_INSTALL_DIR:-${HOME}/.local/bin}"
 TMP_DIR="$(mktemp -d)"
 
 cleanup() {
@@ -21,15 +21,15 @@ need() {
 
 usage() {
   cat <<'USAGE'
-Install compact-event-log (cel).
+Install runtrail.
 
 Environment variables:
-  CEL_INSTALL_REPO  GitHub repo, default: forjd-hermes-bot/compact-event-log
-  CEL_INSTALL_TAG   Release tag, default: latest
-  CEL_INSTALL_DIR   Install directory, default: ~/.local/bin
+  RUNTRAIL_INSTALL_REPO  GitHub repo, default: forjd-hermes-bot/runtrail
+  RUNTRAIL_INSTALL_TAG   Release tag, default: latest
+  RUNTRAIL_INSTALL_DIR   Install directory, default: ~/.local/bin
 
 Example:
-  curl -fsSL https://raw.githubusercontent.com/forjd-hermes-bot/compact-event-log/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/forjd-hermes-bot/runtrail/main/install.sh | bash
 USAGE
 }
 
@@ -57,7 +57,7 @@ case "$OS" in
   mingw*|msys*|cygwin*)
     os_part="pc-windows-msvc"
     EXT="zip"
-    BIN="cel.exe"
+    BIN="runtrail.exe"
     ;;
   *)
     echo "error: unsupported OS: $OS" >&2
@@ -79,7 +79,7 @@ case "$ARCH" in
 esac
 
 TARGET="${arch_part}-${os_part}"
-ASSET="cel-${TARGET}.${EXT}"
+ASSET="runtrail-${TARGET}.${EXT}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 URL="${BASE_URL}/${ASSET}"
 CHECKSUM_URL="${BASE_URL}/SHA256SUMS"
@@ -99,7 +99,7 @@ else
   exit 1
 fi
 
-echo "Installing compact-event-log ${TAG} for ${TARGET}..."
+echo "Installing runtrail ${TAG} for ${TARGET}..."
 fetch "$URL" "$ARCHIVE"
 
 if fetch "$CHECKSUM_URL" "$CHECKSUMS"; then

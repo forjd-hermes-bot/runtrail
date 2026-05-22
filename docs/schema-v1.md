@@ -1,6 +1,6 @@
 # Schema v1
 
-`compact-event-log` stores newline-delimited JSON (`.jsonl`). Each line is one independent event object. The format is intentionally append-only, grep-able, and safe to copy into agent repair prompts.
+`runtrail` stores newline-delimited JSON (`.jsonl`). Each line is one independent event object. The format is intentionally append-only, grep-able, and safe to copy into agent repair prompts.
 
 ## Envelope
 
@@ -12,7 +12,7 @@
 | `ts` | string | yes | RFC3339 UTC timestamp. |
 | `event` | string | yes | Dot-separated event name such as `command.end`. |
 | `level` | string | yes | `trace`, `debug`, `info`, `warn`, or `error`. |
-| `src` | string | no | Producer/source, e.g. `cel`, `git`, `github-actions`. |
+| `src` | string | no | Producer/source, e.g. `runtrail`, `git`, `github-actions`. |
 | `trace_id` | string | no | 32 lowercase hex characters. |
 | `span_id` | string | no | 16 lowercase hex characters. |
 | `parent_span_id` | string | no | 16 lowercase hex characters. |
@@ -27,12 +27,12 @@
 Freeform note from a human or agent.
 
 ```json
-{"schema":"cel.v1","id":"01HX...","seq":1,"ts":"2026-05-22T10:12:00Z","event":"agent.note","level":"info","src":"cel","attrs":{},"body":{"message":"Failure likely due to missing mocked env var"}}
+{"schema":"cel.v1","id":"01HX...","seq":1,"ts":"2026-05-22T10:12:00Z","event":"agent.note","level":"info","src":"runtrail","attrs":{},"body":{"message":"Failure likely due to missing mocked env var"}}
 ```
 
 ### `command.start`
 
-Emitted by `cel run` before the child command output is recorded.
+Emitted by `runtrail run` before the child command output is recorded.
 
 Body fields:
 
@@ -42,7 +42,7 @@ Body fields:
 
 ### `command.end`
 
-Emitted by `cel run` after the child exits.
+Emitted by `runtrail run` after the child exits.
 
 Body fields:
 
@@ -58,7 +58,7 @@ Body fields:
 
 ### `repo.snapshot`
 
-Emitted by `cel repo snapshot`.
+Emitted by `runtrail repo snapshot`.
 
 Body fields:
 
@@ -70,7 +70,7 @@ Body fields:
 
 ### `repo.diff`
 
-Emitted by `cel repo diff`.
+Emitted by `runtrail repo diff`.
 
 Body fields:
 
@@ -83,7 +83,7 @@ Body fields:
 
 ### `ci.github.context`
 
-Emitted by `cel ci github-context` using a strict allowlist of GitHub Actions environment variables. Secrets and arbitrary environment variables are intentionally not captured.
+Emitted by `runtrail ci github-context` using a strict allowlist of GitHub Actions environment variables. Secrets and arbitrary environment variables are intentionally not captured.
 
 ## Compatibility rules
 

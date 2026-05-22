@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Implement `cel tail`
+### Task 1: Implement `runtrail tail`
 
 **Objective:** Show recent events as either human text or raw JSONL.
 
@@ -27,7 +27,7 @@
 5. Run tests.
 6. Commit: `feat: add tail command`.
 
-### Task 2: Implement `cel summarise`
+### Task 2: Implement `runtrail summarise`
 
 **Objective:** Produce an agent-ready Markdown summary of a log.
 
@@ -45,7 +45,7 @@
 5. Run tests.
 6. Commit: `feat: add summarise command`.
 
-### Task 3: Implement `cel diff`
+### Task 3: Implement `runtrail diff`
 
 **Objective:** Compare two logs and report count deltas and added/removed events.
 
@@ -63,7 +63,7 @@
 5. Run tests.
 6. Commit: `feat: add diff command`.
 
-### Task 4: Implement `cel validate`
+### Task 4: Implement `runtrail validate`
 
 **Objective:** Validate JSONL logs and return non-zero on invalid files.
 

@@ -38,7 +38,7 @@ impl Summary {
 
     pub fn to_markdown(&self) -> String {
         let mut out = String::new();
-        out.push_str("# compact-event-log summary\n\n");
+        out.push_str("# runtrail summary\n\n");
         out.push_str(&format!("- Total events: {}\n", self.total));
         out.push_str(&format!(
             "- First timestamp: {}\n",

@@ -1,6 +1,6 @@
-# compact-event-log
+# runtrail
 
-`compact-event-log` (`cel`) is a tiny Rust CLI and JSONL event format for recording agent actions, browser QA steps, repo changes, command/test results, notes, and CI events in one local, portable, diffable stream.
+`runtrail` (`runtrail`) is a tiny Rust CLI and JSONL event format for recording agent actions, browser QA steps, repo changes, command/test results, notes, and CI events in one local, portable, diffable stream.
 
 It is meant to be a cheap black-box recorder for agentic development workflows: easy to append to, easy to inspect with shell tools, and easy to summarise into repair prompts.
 
@@ -20,20 +20,20 @@ MVP complete:
 Install the latest binary from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/forjd-hermes-bot/compact-event-log/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/forjd-hermes-bot/runtrail/main/install.sh | bash
 ```
 
 Optional environment variables:
 
-- `CEL_INSTALL_DIR` — install directory, default `~/.local/bin`
-- `CEL_INSTALL_TAG` — release tag, default `latest`
-- `CEL_INSTALL_REPO` — GitHub repo, default `forjd-hermes-bot/compact-event-log`
+- `RUNTRAIL_INSTALL_DIR` — install directory, default `~/.local/bin`
+- `RUNTRAIL_INSTALL_TAG` — release tag, default `latest`
+- `RUNTRAIL_INSTALL_REPO` — GitHub repo, default `forjd-hermes-bot/runtrail`
 
 Build from source:
 
 ```bash
 cargo build --release
-./target/release/cel --help
+./target/release/runtrail --help
 ```
 
 During development:
@@ -59,7 +59,7 @@ Required fields:
 Common fields:
 
 - `level`: `trace`, `debug`, `info`, `warn`, `error`
-- `src`: event source, e.g. `cel`, `hermes-agent`, `github-actions`
+- `src`: event source, e.g. `runtrail`, `hermes-agent`, `github-actions`
 - `attrs`: structured metadata object
 - `body`: event-specific JSON payload
 - `trace_id`, `span_id`, `parent_span_id`: optional trace correlation fields
@@ -68,7 +68,7 @@ Common fields:
 Example:
 
 ```json
-{"schema":"cel.v1","id":"01KS...","seq":1,"ts":"2026-05-22T12:34:56Z","event":"agent.note","level":"info","src":"cel","attrs":{},"body":{"message":"hello"}}
+{"schema":"cel.v1","id":"01KS...","seq":1,"ts":"2026-05-22T12:34:56Z","event":"agent.note","level":"info","src":"runtrail","attrs":{},"body":{"message":"hello"}}
 ```
 
 Example logs live in:
@@ -82,15 +82,15 @@ Example logs live in:
 ### Log an event
 
 ```bash
-cel log --event agent.note --message "Investigating failing CI"
+runtrail log --event agent.note --message "Investigating failing CI"
 ```
 
-Default file: `.compact-event-log/events.jsonl`.
+Default file: `.runtrail/events.jsonl`.
 
 With attributes and JSON body:
 
 ```bash
-cel log \
+runtrail log \
   --event command.run \
   --attr tool.name=terminal \
   --attr exit_code=0 \
@@ -100,14 +100,14 @@ cel log \
 ### Tail recent events
 
 ```bash
-cel tail --lines 5
-cel tail --lines 5 --json
+runtrail tail --lines 5
+runtrail tail --lines 5 --json
 ```
 
 ### Summarise for humans or agents
 
 ```bash
-cel summarise --file .compact-event-log/events.jsonl
+runtrail summarise --file .runtrail/events.jsonl
 ```
 
 The summary includes total events, first/last timestamps, counts by event and level, warnings/errors, and recent events.
@@ -115,7 +115,7 @@ The summary includes total events, first/last timestamps, counts by event and le
 ### Diff two logs
 
 ```bash
-cel diff before.jsonl after.jsonl
+runtrail diff before.jsonl after.jsonl
 ```
 
 The diff reports count deltas, added/removed event IDs, and newly introduced warnings/errors.
@@ -123,18 +123,18 @@ The diff reports count deltas, added/removed event IDs, and newly introduced war
 ### Run a command and capture evidence
 
 ```bash
-cel run -- cargo test
-cel run --file .compact-event-log/events.jsonl --cwd . --preview-bytes 4096 -- npm test
+runtrail run -- cargo test
+runtrail run --file .runtrail/events.jsonl --cwd . --preview-bytes 4096 -- npm test
 ```
 
-`cel run` emits `command.start` and `command.end` events. It returns the child command exit code.
+`runtrail run` emits `command.start` and `command.end` events. It returns the child command exit code.
 
 ### Capture repository evidence
 
 ```bash
-cel repo snapshot
-cel repo diff
-cel repo diff --stat-only
+runtrail repo snapshot
+runtrail repo diff
+runtrail repo diff --stat-only
 ```
 
 `repo snapshot` captures branch, HEAD, dirty state, and `git status --porcelain` files. `repo diff` captures `git diff --stat` plus the patch unless `--stat-only` is used.
@@ -142,7 +142,7 @@ cel repo diff --stat-only
 ### Generate an agent repair prompt
 
 ```bash
-cel repair-prompt --file .compact-event-log/events.jsonl
+runtrail repair-prompt --file .runtrail/events.jsonl
 ```
 
 The prompt includes failure evidence, recent command results, repository context when present, suspected causes, and safe commands to try.
@@ -150,7 +150,7 @@ The prompt includes failure evidence, recent command results, repository context
 ### Validate a log
 
 ```bash
-cel validate --file .compact-event-log/events.jsonl
+runtrail validate --file .runtrail/events.jsonl
 ```
 
 Validation checks JSONL framing, required fields, schema version, sequence numbers, timestamp parsing, levels, and trace/span ID format.
@@ -158,7 +158,7 @@ Validation checks JSONL framing, required fields, schema version, sequence numbe
 ### Capture GitHub Actions context
 
 ```bash
-cel ci github-context --file .compact-event-log/events.jsonl
+runtrail ci github-context --file .runtrail/events.jsonl
 ```
 
 This records only a safe allowlist of environment variables:
@@ -180,21 +180,21 @@ This records only a safe allowlist of environment variables:
 ### Generate shell completions
 
 ```bash
-cel completions bash > cel.bash
-cel completions zsh > _cel
-cel completions fish > cel.fish
+runtrail completions bash > runtrail.bash
+runtrail completions zsh > _runtrail
+runtrail completions fish > runtrail.fish
 ```
 
 ## Example event types
 
 ```bash
-cel log --event command.run --body '{"cmd":"cargo test","exit_code":0}'
-cel log --event browser.navigate --attr browser.url=https://example.com
-cel log --event browser.assert --body '{"text":"Dashboard loaded","ok":true}'
-cel log --event test.result --body '{"runner":"cargo test","passed":21,"failed":0}'
-cel log --event repo.change --body '{"files":[{"path":"src/main.rs","status":"M"}]}'
-cel log --event ci.status --attr github.run_id=123 --body '{"conclusion":"success"}'
-cel log --event agent.note --message "Failure likely caused by missing env var"
+runtrail log --event command.run --body '{"cmd":"cargo test","exit_code":0}'
+runtrail log --event browser.navigate --attr browser.url=https://example.com
+runtrail log --event browser.assert --body '{"text":"Dashboard loaded","ok":true}'
+runtrail log --event test.result --body '{"runner":"cargo test","passed":21,"failed":0}'
+runtrail log --event repo.change --body '{"files":[{"path":"src/main.rs","status":"M"}]}'
+runtrail log --event ci.status --attr github.run_id=123 --body '{"conclusion":"success"}'
+runtrail log --event agent.note --message "Failure likely caused by missing env var"
 ```
 
 ## Interoperability
@@ -202,9 +202,9 @@ cel log --event agent.note --message "Failure likely caused by missing env var"
 Because logs are JSONL, they work with normal shell tools:
 
 ```bash
-jq 'select(.event == "repo.change")' .compact-event-log/events.jsonl
-jq 'select(.level == "error")' .compact-event-log/events.jsonl
-lnav .compact-event-log/events.jsonl
+jq 'select(.event == "repo.change")' .runtrail/events.jsonl
+jq 'select(.level == "error")' .runtrail/events.jsonl
+lnav .runtrail/events.jsonl
 ```
 
 ## Design notes

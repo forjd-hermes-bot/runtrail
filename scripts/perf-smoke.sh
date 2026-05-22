@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 cargo build --release >/dev/null
-BIN="$ROOT/target/release/cel"
-TMP="${TMPDIR:-/tmp}/cel-perf-$$"
+BIN="$ROOT/target/release/runtrail"
+TMP="${TMPDIR:-/tmp}/runtrail-perf-$$"
 mkdir -p "$TMP"
 LOG="$TMP/events.jsonl"
 N="${1:-10000}"
@@ -37,7 +37,7 @@ bytes="$(wc -c < "$LOG")"
 lines="$(wc -l < "$LOG")"
 
 cat <<REPORT
-compact-event-log performance smoke
+runtrail performance smoke
 - events: $lines
 - bytes: $bytes
 - generate_ms: $gen_ms
