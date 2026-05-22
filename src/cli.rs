@@ -1,6 +1,8 @@
+use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
 use crate::log_io::{append_event, next_seq, read_events, validate_file};
 use crate::summary::{Summary, format_level};
+
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value, json};
@@ -25,6 +27,16 @@ enum Commands {
     Validate(FileArg),
     /// Summarise an event log as Markdown.
     Summarise(SummariseArgs),
+    /// Compare two event logs.
+    Diff(DiffArgs),
+}
+
+#[derive(Debug, Parser)]
+struct DiffArgs {
+    /// Earlier log file.
+    before: PathBuf,
+    /// Later log file.
+    after: PathBuf,
 }
 
 #[derive(Debug, Parser)]
@@ -119,6 +131,7 @@ pub fn run() -> Result<()> {
         Commands::Tail(args) => tail(args),
         Commands::Validate(args) => validate(&args.file),
         Commands::Summarise(args) => summarise(args),
+        Commands::Diff(args) => diff(args),
     }
 }
 
@@ -168,6 +181,14 @@ fn summarise(args: SummariseArgs) -> Result<()> {
     let events = read_events(&args.file)?;
     let summary = Summary::from_events(&events, args.recent);
     print!("{}", summary.to_markdown());
+    Ok(())
+}
+
+fn diff(args: DiffArgs) -> Result<()> {
+    let before = read_events(&args.before)?;
+    let after = read_events(&args.after)?;
+    let diff = LogDiff::between(&before, &after);
+    print!("{}", diff.to_markdown());
     Ok(())
 }
 

@@ -193,3 +193,46 @@ fn summarise_outputs_counts_warnings_and_recent_events() {
         .stdout(predicate::str::contains("`error`: 1"))
         .stdout(predicate::str::contains("boom"));
 }
+
+#[test]
+fn diff_outputs_added_removed_and_new_errors() {
+    let dir = tempdir().unwrap();
+    let before = dir.path().join("before.jsonl");
+    let after = dir.path().join("after.jsonl");
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            before.to_str().unwrap(),
+            "--event",
+            "agent.note",
+        ])
+        .assert()
+        .success();
+    std::fs::copy(&before, &after).unwrap();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            after.to_str().unwrap(),
+            "--event",
+            "error",
+            "--level",
+            "error",
+            "--message",
+            "boom",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["diff", before.to_str().unwrap(), after.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Delta: 1"))
+        .stdout(predicate::str::contains("New warnings and errors"))
+        .stdout(predicate::str::contains("boom"));
+}
