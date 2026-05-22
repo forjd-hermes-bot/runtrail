@@ -73,3 +73,80 @@ fn log_requires_event_name() {
         .failure()
         .stderr(predicate::str::contains("event"));
 }
+
+#[test]
+fn tail_shows_recent_events_as_json() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    for idx in 0..3 {
+        Command::cargo_bin("cel")
+            .unwrap()
+            .args([
+                "log",
+                "--file",
+                file.to_str().unwrap(),
+                "--event",
+                "agent.note",
+                "--message",
+                &format!("msg-{idx}"),
+            ])
+            .assert()
+            .success();
+    }
+
+    let output = Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "tail",
+            "--file",
+            file.to_str().unwrap(),
+            "--lines",
+            "2",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<_> = String::from_utf8(output)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    assert_eq!(lines.len(), 2);
+    let first: Value = serde_json::from_str(&lines[0]).unwrap();
+    assert_eq!(first["seq"], 2);
+}
+
+#[test]
+fn validate_reports_valid_and_invalid_logs() {
+    let dir = tempdir().unwrap();
+    let good = dir.path().join("good.jsonl");
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            good.to_str().unwrap(),
+            "--event",
+            "agent.note",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["validate", "--file", good.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("valid"));
+
+    let bad = dir.path().join("bad.jsonl");
+    std::fs::write(&bad, "{nope}\n").unwrap();
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["validate", "--file", bad.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("line 1"));
+}

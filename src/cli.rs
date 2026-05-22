@@ -1,9 +1,9 @@
 use crate::event::{Event, Level, NewEvent};
-use crate::log_io::{append_event, next_seq};
+use crate::log_io::{append_event, next_seq, read_events, validate_file};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value, json};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_LOG_FILE: &str = ".compact-event-log/events.jsonl";
 
@@ -18,6 +18,30 @@ pub struct Cli {
 enum Commands {
     /// Append an event to a JSONL log file.
     Log(LogArgs),
+    /// Show recent events.
+    Tail(TailArgs),
+    /// Validate a JSONL event log.
+    Validate(FileArg),
+}
+
+#[derive(Debug, Parser)]
+struct FileArg {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+}
+
+#[derive(Debug, Parser)]
+struct TailArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+    /// Number of recent lines to show.
+    #[arg(long, default_value_t = 20)]
+    lines: usize,
+    /// Print raw JSONL records.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -79,6 +103,8 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Log(args) => log(args),
+        Commands::Tail(args) => tail(args),
+        Commands::Validate(args) => validate(&args.file),
     }
 }
 
@@ -103,6 +129,35 @@ fn log(args: LogArgs) -> Result<()> {
     append_event(&args.file, &event)?;
     println!("{}", serde_json::to_string(&event)?);
     Ok(())
+}
+
+fn tail(args: TailArgs) -> Result<()> {
+    let events = read_events(&args.file)?;
+    let start = events.len().saturating_sub(args.lines);
+    for event in &events[start..] {
+        if args.json {
+            println!("{}", serde_json::to_string(event)?);
+        } else {
+            println!(
+                "{} {} {:?} {}",
+                event.seq, event.ts, event.level, event.event
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate(path: &Path) -> Result<()> {
+    let issues = validate_file(path);
+    if issues.is_empty() {
+        println!("valid: {}", path.display());
+        Ok(())
+    } else {
+        for issue in &issues {
+            eprintln!("line {}: {}", issue.line, issue.message);
+        }
+        Err(anyhow!("validation failed with {} issue(s)", issues.len()))
+    }
 }
 
 pub fn parse_attrs(values: &[String]) -> Result<Map<String, Value>> {
