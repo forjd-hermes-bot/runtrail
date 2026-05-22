@@ -5,6 +5,11 @@ on:
     branches: [main]
     tags: ['v*', '*-v*']
   workflow_dispatch:
+    inputs:
+      publish_tag:
+        description: Release tag to publish binaries to when running manually
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -93,7 +98,7 @@ jobs:
     name: Publish binaries
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.ref, '-v')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.ref, '-v') || inputs.publish_tag != ''
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -111,7 +116,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          if [[ -n "${{ inputs.publish_tag }}" ]]; then
+            tag="${{ inputs.publish_tag }}"
+            echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
+            echo "name=${tag}" >> "$GITHUB_OUTPUT"
+            echo "body=Release binaries for ${tag}." >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             tag="${GITHUB_REF_NAME}"
             echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
             echo "name=${tag}" >> "$GITHUB_OUTPUT"
