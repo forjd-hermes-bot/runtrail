@@ -104,7 +104,7 @@ fn evidence_preview(body: &Value) -> String {
 }
 
 fn compact_json(value: Option<&Value>) -> String {
-    value.map_or_else(|| "null".to_string(), |value| evidence_preview(value))
+    value.map_or_else(|| "null".to_string(), evidence_preview)
 }
 
 fn format_repo_snapshot(body: &Value) -> String {
