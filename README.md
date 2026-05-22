@@ -17,6 +17,20 @@ MVP complete:
 
 ## Install / build
 
+Install the latest binary from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/forjd-hermes-bot/compact-event-log/main/install.sh | bash
+```
+
+Optional environment variables:
+
+- `CEL_INSTALL_DIR` — install directory, default `~/.local/bin`
+- `CEL_INSTALL_TAG` — release tag, default `latest`
+- `CEL_INSTALL_REPO` — GitHub repo, default `forjd-hermes-bot/compact-event-log`
+
+Build from source:
+
 ```bash
 cargo build --release
 ./target/release/cel --help
