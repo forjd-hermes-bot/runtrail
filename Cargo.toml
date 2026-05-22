@@ -1,6 +1,6 @@
 [package]
 name = "compact-event-log"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A tiny JSONL-first event log for agent, browser QA, repo, and CI workflows"
