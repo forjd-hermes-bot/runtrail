@@ -405,3 +405,34 @@ fn run_command_returns_child_exit_code_and_logs_error() {
     assert!(raw.contains("\"level\":\"error\""));
     assert!(raw.contains("\"exit_code\":7"));
 }
+
+#[test]
+fn repair_prompt_outputs_agent_ready_markdown() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args([
+            "run",
+            "--file",
+            file.to_str().unwrap(),
+            "--cwd",
+            dir.path().to_str().unwrap(),
+            "--",
+            "sh",
+            "-c",
+            "echo boom >&2; exit 2",
+        ])
+        .assert()
+        .code(2);
+
+    Command::cargo_bin("cel")
+        .unwrap()
+        .args(["repair-prompt", "--file", file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Agent Repair Prompt"))
+        .stdout(predicate::str::contains("Failure Evidence"))
+        .stdout(predicate::str::contains("Safe Commands To Try"))
+        .stdout(predicate::str::contains("boom"));
+}

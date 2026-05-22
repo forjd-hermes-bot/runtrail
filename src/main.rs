@@ -4,6 +4,7 @@ pub mod diff;
 pub mod event;
 pub mod git;
 pub mod log_io;
+pub mod repair;
 pub mod summary;
 
 use anyhow::Result;

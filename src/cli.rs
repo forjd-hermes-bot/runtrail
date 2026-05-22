@@ -3,6 +3,7 @@ use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
 use crate::git;
 use crate::log_io::{append_event, next_seq, read_events, validate_file};
+use crate::repair;
 use crate::summary::{Summary, format_level};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
@@ -37,6 +38,15 @@ enum Commands {
     Repo(RepoArgs),
     /// Run a command and log start/end events.
     Run(RunArgs),
+    /// Generate an agent-ready repair prompt from an event log.
+    RepairPrompt(RepairPromptArgs),
+}
+
+#[derive(Debug, Parser)]
+struct RepairPromptArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
 }
 
 #[derive(Debug, Parser)]
@@ -215,6 +225,7 @@ pub fn run() -> Result<()> {
         Commands::Ci(args) => ci(args),
         Commands::Repo(args) => repo(args),
         Commands::Run(args) => run_command(args),
+        Commands::RepairPrompt(args) => repair_prompt(args),
     }
 }
 
@@ -302,6 +313,12 @@ fn diff(args: DiffArgs) -> Result<()> {
     let after = read_events(&args.after)?;
     let diff = LogDiff::between(&before, &after);
     print!("{}", diff.to_markdown());
+    Ok(())
+}
+
+fn repair_prompt(args: RepairPromptArgs) -> Result<()> {
+    let events = read_events(&args.file)?;
+    print!("{}", repair::repair_prompt(&events));
     Ok(())
 }
 
