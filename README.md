@@ -25,6 +25,7 @@ During development:
 ```bash
 cargo test
 cargo clippy --all-targets -- -D warnings
+scripts/perf-smoke.sh
 ```
 
 ## Event schema v1
