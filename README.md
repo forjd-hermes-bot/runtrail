@@ -1,0 +1,1 @@
+compact-event-log
