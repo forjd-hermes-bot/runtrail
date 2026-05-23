@@ -1,3 +1,4 @@
+use crate::redaction;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::process::{Command, ExitStatus};
@@ -30,16 +31,24 @@ pub fn run_command(
         "cwd": cwd.display().to_string(),
         "started_at": started_at,
     });
+    let stdout_preview = redaction::preview(&output.stdout, preview_bytes);
+    let stderr_preview = redaction::preview(&output.stderr, preview_bytes);
     let end_body = json!({
         "cmd": command,
         "cwd": cwd.display().to_string(),
         "exit_code": exit_code,
         "success": output.status.success(),
         "duration_ms": duration_ms,
-        "stdout_preview": preview(&output.stdout, preview_bytes),
-        "stderr_preview": preview(&output.stderr, preview_bytes),
-        "stdout_truncated": output.stdout.len() > preview_bytes,
-        "stderr_truncated": output.stderr.len() > preview_bytes,
+        "stdout_preview": stdout_preview.text,
+        "stderr_preview": stderr_preview.text,
+        "stdout_truncated": stdout_preview.truncated,
+        "stderr_truncated": stderr_preview.truncated,
+        "stdout_redacted": stdout_preview.redacted,
+        "stderr_redacted": stderr_preview.redacted,
+        "capture": {
+            "stdout": stdout_preview.metadata(),
+            "stderr": stderr_preview.metadata(),
+        }
     });
     Ok(CommandRunResult {
         start_body,
@@ -50,15 +59,6 @@ pub fn run_command(
 
 fn exit_code(status: ExitStatus) -> i32 {
     status.code().unwrap_or(128)
-}
-
-fn preview(bytes: &[u8], limit: usize) -> String {
-    let slice = if bytes.len() > limit {
-        &bytes[..limit]
-    } else {
-        bytes
-    };
-    String::from_utf8_lossy(slice).to_string()
 }
 
 #[cfg(test)]
@@ -91,5 +91,23 @@ mod tests {
         let result = run_command(dir.path(), &command, 3).unwrap();
         assert_eq!(result.end_body["stdout_preview"], "123");
         assert_eq!(result.end_body["stdout_truncated"], true);
+        assert_eq!(result.end_body["capture"]["stdout"]["truncated"], true);
+    }
+
+    #[test]
+    fn run_command_redacts_secret_looking_output() {
+        let dir = tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf 'token=abc123 password:hunter2'".to_string(),
+        ];
+        let result = run_command(dir.path(), &command, 100).unwrap();
+        assert_eq!(
+            result.end_body["stdout_preview"],
+            "token=[REDACTED] password:[REDACTED]"
+        );
+        assert_eq!(result.end_body["stdout_redacted"], true);
+        assert_eq!(result.end_body["capture"]["stdout"]["redacted"], true);
     }
 }
