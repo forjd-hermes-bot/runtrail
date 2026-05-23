@@ -2,135 +2,153 @@
 
 `runtrail` is a local-first event trail for agentic development workflows: command evidence, repository state, CI context, test results, browser QA steps, and agent notes in one compact JSONL stream.
 
-This roadmap is directional, not a release contract. It captures the next useful product slices after the MVP and should change as the tool gets dogfooded in real debugging and CI-repair loops.
+This roadmap is directional, not a release contract. It records what is already shipped on `main`, what is next, and which longer-term ideas should wait until the core workflow has been dogfooded in real debugging and CI-repair loops.
 
 ## Product Principles
 
 - **Evidence over vibes:** every feature should make a future debugging or repair session easier to ground in facts.
 - **Local-first and portable:** a trail should be readable with `tail`, `jq`, Git diffs, and normal text tooling.
-- **Agent-ready by default:** summaries and repair prompts should be concise enough to paste into an agent while preserving the important failure context.
+- **Agent-ready by default:** summaries and repair prompts should be concise enough to paste into an agent while preserving important failure context.
 - **Safe capture:** prefer explicit allowlists, bounded previews, truncation markers, and redaction metadata over broad environment or log capture.
 - **Small and boring:** no daemon, database, hosted service, or custom query language until the plain-file workflow proves it needs more.
 - **Stable core, experimental edges:** keep the event envelope predictable while allowing new event names and payloads to evolve.
 
-## Current Baseline
+## Shipped Baseline
 
-The MVP already includes:
+The current `main` branch includes the original MVP plus several post-MVP slices:
 
 - JSONL event storage at `.runtrail/events.jsonl`.
 - Core event envelope validation.
 - `runtrail log` for appending arbitrary events.
-- `runtrail run` for command start/end evidence.
-- `runtrail repo snapshot` and `runtrail repo diff` for Git context.
+- `runtrail run` for command start/end evidence with bounded stdout/stderr previews.
+- Secret-looking output redaction and truncation metadata for command previews.
+- Safe command environment metadata capture via explicit allowlists.
+- `runtrail repo snapshot` and `runtrail repo diff` for Git context, including normalized remote metadata.
 - `runtrail ci github-context` for safe GitHub Actions metadata capture.
+- `runtrail ci capture` for portable CI repair fixture creation under `.runtrail/artifacts/`.
 - `runtrail tail`, `summarise`, `diff`, and `validate`.
-- `runtrail repair-prompt` for agent-ready failure handoff.
+- `runtrail validate --strict` for CI-focused format hardening where `seq` must match the physical JSONL line number.
+- `runtrail repair-prompt` for agent-ready failure handoff, with event/level/trace filters.
+- `runtrail replay` for conservative command-hint output rather than pretending to be a full CI emulator.
+- `runtrail index` and `runtrail inspect` for lightweight trail exploration.
+- Browser QA and agent workflow event conventions, with example JSONL logs.
 - Schema docs, examples, CI, release automation, binary builds, and installer.
 
-## Near-Term Roadmap
+## Recently Completed
 
-### v0.4 — Safer, richer capture
+These roadmap items have already been implemented and should now be treated as shipped behavior, not pending work:
 
-Goal: make the evidence captured by `runtrail` more useful without making logs noisy or risky.
+### Safer, richer capture
 
-- Add first-class redaction helpers for command output previews.
-- Mark truncated and redacted fields consistently in `attrs` or event bodies.
-- Capture selected command environment metadata via allowlists, never broad env dumps.
-- Improve `repo snapshot` with remote URL normalization, upstream branch, and commit cleanliness details.
-- Add optional dependency metadata events for common ecosystems:
-  - Rust: `Cargo.toml`, `Cargo.lock`, toolchain/channel.
-  - Node: `package.json`, lockfile type, package manager.
-  - Python: `pyproject.toml`, lockfile/requirements presence.
-- Add tests that prove obvious secret-looking values are not emitted by default.
+- Added first-class redaction helpers for command output previews.
+- Added consistent truncated/redacted preview metadata.
+- Added allowlisted command environment metadata capture.
+- Improved repository snapshots with normalized remote metadata and cleanliness details.
+- Added dependency metadata capture for common Rust, Node, and Python project markers.
+- Added tests proving obvious secret-looking values are not emitted in command previews.
 
-### v0.5 — CI fixture capture
+### CI fixture capture
 
-Goal: turn a CI failure into a portable local bundle an agent can reason about.
+- Added `runtrail ci capture` for CI-oriented trail creation.
+- Captures safe CI context, repository evidence, changed files, and dependency metadata.
+- Stores optional repair artifacts under `.runtrail/artifacts/` and references them from the event trail.
+- Emits unsupported-feature warnings for local replay gaps such as services, secrets, permissions, hosted runner differences, and matrix differences.
 
-- Add `runtrail ci capture` for CI-oriented trail creation.
-- Capture workflow/job identity, safe GitHub context, failing command summaries, changed files, and dependency metadata.
-- Store optional artifacts under `.runtrail/artifacts/` with references from JSONL events.
-- Add explicit unsupported-feature warnings for local replay gaps such as services, secrets, permissions, hosted runner differences, and matrix differences.
-- Produce a single repair handoff containing:
-  - failure summary,
-  - relevant commands,
-  - repo diff/stat,
-  - safe reproduction hints,
-  - suspected missing context.
-- Document GitHub Actions usage patterns and a copy-paste workflow snippet.
+### Replay and repair ergonomics
 
-### v0.6 — Replay and repair ergonomics
+- Added `runtrail replay` as conservative command-hint output, not a full CI emulator.
+- Added replay metadata such as supported/partial/unsupported context.
+- Improved repair prompt grouping around failures and repository context.
+- Added filters for `repair-prompt` by event, level, and trace ID.
+- Kept Markdown output suitable for agent handoffs and issue/PR comments.
 
-Goal: make the trail actionable after capture.
+### Inspection, indexing, and workflow conventions
 
-- Add `runtrail replay` as a conservative command-hint runner, not a magic CI emulator.
-- Support replay metadata such as `supported`, `partial`, and `unsupported_reason`.
-- Generate shell fallback commands when `act` or platform-specific runners are unavailable.
-- Improve `repair-prompt` grouping by failing command, changed file, CI job, and latest repo state.
-- Add `--since`, `--event`, `--level`, and `--trace-id` filters to summary/repair workflows.
-- Add Markdown output that is stable enough for PR comments or issue comments.
+- Added lightweight JSON indexes for trail exploration.
+- Added `runtrail inspect` for compact human-readable event previews.
+- Documented event conventions for browser QA and agent tool workflows.
+- Added browser QA and agent session example logs.
 
-### v0.7 — Inspection and indexing
+## Next Roadmap
 
-Goal: keep JSONL as the source of truth while making larger trails pleasant to inspect.
-
-- Add lightweight derived indexes for event ID, event name, level, timestamp, and trace ID.
-- Keep indexes optional and rebuildable; never make them required to read a trail.
-- Add query-style filters without inventing a full custom query language.
-- Add `runtrail inspect` or improve `tail` for compact human-readable event previews.
-- Explore `lnav`/SQLite-friendly export paths for larger debugging sessions.
-- Add performance smoke tests for larger logs, such as 100k events.
-
-### v0.8 — Browser and agent workflow events
-
-Goal: make runtrail useful beyond shell commands and CI.
-
-- Document event conventions for browser QA:
-  - navigation,
-  - screenshot/artifact creation,
-  - console errors,
-  - accessibility snapshots,
-  - assertions.
-- Document event conventions for agent tool calls:
-  - tool start/end,
-  - model/provider metadata,
-  - approval decisions,
-  - file edits,
-  - generated artifacts.
-- Add examples that mirror real agent sessions and web-app QA loops.
-- Add integration recipes for Hermes, browser automation, and GitHub PR review workflows.
-
-### v0.9 — Format hardening
+### v0.9 — Format hardening and compatibility
 
 Goal: prepare the event format for a stable 1.0 promise.
 
-- Resolve the schema naming/versioning story and document compatibility rules clearly.
+- Resolve the schema naming/versioning story:
+  - keep `cel.v1` for compatibility, or
+  - migrate to a `runtrail.v1` schema identifier before 1.0.
+- Document producer/consumer compatibility rules for the 1.x line.
 - Add migration guidance for any pre-1.0 envelope differences.
-- Add golden tests for representative event logs.
-- `runtrail validate --strict` for CI-focused format hardening.
+- Add golden fixture tests for representative event logs:
+  - command run success/failure,
+  - CI capture,
+  - browser QA,
+  - agent session,
+  - repair/replay handoff.
+- Define how strict validation should evolve beyond `seq == line_number` without breaking normal JSONL workflows.
 - Decide whether compact binary export is needed before 1.0 or should remain post-1.0.
-- Document producer/consumer compatibility expectations.
+
+### v0.10 — Dogfood and polish
+
+Goal: make runtrail easier to use repeatedly in real agent and CI workflows.
+
+- Add copy-paste GitHub Actions examples for:
+  - capturing a failed job,
+  - uploading `.runtrail/` artifacts,
+  - generating a repair prompt as a workflow artifact.
+- Add a performance smoke test for larger trails, such as 100k events.
+- Improve docs around safe sharing and artifact review before publishing logs.
+- Add more realistic example trails from actual debugging sessions, with sensitive values redacted.
+- Decide whether `summarise` should gain the same filters as `repair-prompt`.
+- Add clear troubleshooting docs for common malformed-log and CI-capture failure cases.
 
 ### v1.0 — Stable local event trail
 
 Goal: provide a stable CLI and schema that other tools can safely produce and consume.
 
-- Commit to the stable JSONL envelope for the 1.x line.
+- Commit to a stable JSONL envelope for the 1.x line.
 - Keep existing core commands compatible:
   - `log`,
   - `run`,
   - `repo snapshot`,
   - `repo diff`,
   - `ci github-context`,
+  - `ci capture`,
   - `tail`,
   - `summarise`,
   - `diff`,
   - `validate`,
-  - `repair-prompt`.
-- Publish complete schema docs and example logs.
-- Publish installation and release documentation.
+  - `repair-prompt`,
+  - `replay`,
+  - `index`,
+  - `inspect`.
+- Publish complete schema docs and producer guidance.
+- Publish complete installation, release, and upgrade documentation.
 - Verify Linux, macOS, and Windows release assets.
-- Provide clear guidance for third-party producers.
+- Provide clear compatibility guidance for third-party producers and consumers.
+
+## Suggested Immediate Next PRs
+
+1. **Schema identifier decision**
+   - Decide whether the stable schema should remain `cel.v1` or become `runtrail.v1`.
+   - Document the compatibility and migration plan.
+
+2. **Golden fixture tests**
+   - Add checked-in representative JSONL fixtures under `examples/` or `tests/fixtures/`.
+   - Validate them in unit/integration tests and strict mode where appropriate.
+
+3. **GitHub Actions repair workflow docs**
+   - Add a workflow snippet that captures `.runtrail/` on failure.
+   - Show how to upload trail artifacts and generate a repair prompt.
+
+4. **Large-log performance smoke**
+   - Add a script or test path for validating and summarising large synthetic trails.
+   - Document expected local performance bounds.
+
+5. **Safe sharing guide**
+   - Add a short checklist for reviewing trails before sharing in issues, PRs, or with agents.
+   - Cover secrets, proprietary diffs, sensitive paths, and artifact retention.
 
 ## Later Ideas
 
@@ -158,24 +176,8 @@ These are intentionally deferred until the core workflow proves itself.
 ## Open Questions
 
 - Should the schema version remain `cel.v1` for compatibility, or move to a `runtrail.v1` name before 1.0?
-- Should replay be a separate command family or part of CI fixture capture?
+- Should compact binary export exist before 1.0, or stay deferred until JSONL limitations are proven?
 - How much output preview is useful before logs become too large or risky?
-- Which integrations should be first-class examples: Hermes, GitHub Actions, browser QA, or generic shell workflows?
+- Which integrations should be first-class examples beyond Hermes, GitHub Actions, browser QA, and generic shell workflows?
 - Should indexes live inside `.runtrail/` by default or be generated on demand into a cache path?
-
-## Suggested Immediate Next PRs
-
-1. **Redaction and truncation metadata**
-   - Add explicit redaction/truncation markers to command output previews.
-   - Add tests for secret-looking values.
-
-2. **CI fixture capture skeleton**
-   - Add a `runtrail ci capture` command that emits safe context and repo evidence.
-   - Document a GitHub Actions snippet.
-
-3. **Repair prompt filters**
-   - Add `--since`, `--event`, and `--level` filters to `repair-prompt` and `summarise`.
-
-4. **Schema cleanup before 1.0**
-   - Decide and document the schema identifier strategy.
-   - Add golden fixture tests for example logs.
+- Should repair summaries grow PR-comment output directly, or should that stay as integration glue outside the core CLI?
