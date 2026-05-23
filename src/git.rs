@@ -25,6 +25,9 @@ pub fn snapshot_body(cwd: &Path) -> Result<Value> {
         "branch": context.branch,
         "head": context.head,
         "dirty": context.dirty,
+        "clean": !context.dirty,
+        "upstream": upstream_branch(cwd).ok(),
+        "remote_url": normalized_remote_url(cwd).ok(),
         "files": files.into_iter().map(|file| json!({
             "path": file.path,
             "status": file.status,
@@ -63,6 +66,31 @@ fn git_context(cwd: &Path) -> Result<GitContext> {
         head,
         dirty,
     })
+}
+
+fn upstream_branch(cwd: &Path) -> Result<String> {
+    git_output(
+        cwd,
+        ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+}
+
+fn normalized_remote_url(cwd: &Path) -> Result<String> {
+    let url = git_output(cwd, ["remote", "get-url", "origin"])?;
+    Ok(normalize_remote_url(&url))
+}
+
+fn normalize_remote_url(url: &str) -> String {
+    let without_credentials = if let Some((scheme, rest)) = url.split_once("://") {
+        if let Some(at) = rest.rfind('@') {
+            format!("{scheme}://{}", &rest[at + 1..])
+        } else {
+            url.to_string()
+        }
+    } else {
+        url.to_string()
+    };
+    without_credentials.trim_end_matches(".git").to_string()
 }
 
 fn status_files(cwd: &Path) -> Result<Vec<GitFileChange>> {
@@ -125,6 +153,19 @@ mod tests {
 
         let body = snapshot_body(dir.path()).unwrap();
         assert_eq!(body["dirty"], true);
+        assert_eq!(body["clean"], false);
         assert_eq!(body["files"][0]["path"], "README.md");
+    }
+
+    #[test]
+    fn normalize_remote_url_strips_credentials_and_git_suffix() {
+        assert_eq!(
+            normalize_remote_url("https://user:secret@github.com/forjd/runtrail.git"),
+            "https://github.com/forjd/runtrail"
+        );
+        assert_eq!(
+            normalize_remote_url("git@github.com:forjd/runtrail.git"),
+            "git@github.com:forjd/runtrail"
+        );
     }
 }

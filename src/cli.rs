@@ -71,6 +71,9 @@ struct RunArgs {
     /// Number of stdout/stderr bytes to keep in previews.
     #[arg(long, default_value_t = 4096)]
     preview_bytes: usize,
+    /// Safe environment variable name to capture. Repeat for multiple names.
+    #[arg(long = "env")]
+    env_allowlist: Vec<String>,
     /// Command and args to run.
     #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
     command: Vec<String>,
@@ -397,6 +400,12 @@ fn run_command(args: RunArgs) -> Result<()> {
     let result = command_run::run_command(&args.cwd, &args.command, args.preview_bytes)?;
     let mut attrs = Map::new();
     attrs.insert("cmd".to_string(), Value::String(args.command.join(" ")));
+    if !args.env_allowlist.is_empty() {
+        attrs.insert(
+            "env".to_string(),
+            Value::Object(capture_env_allowlist(&args.env_allowlist)),
+        );
+    }
     append_new_event(AppendNewEvent {
         file: &args.file,
         seq: start_seq,
@@ -437,12 +446,7 @@ fn run_command(args: RunArgs) -> Result<()> {
 fn github_context(args: CiGithubContextArgs) -> Result<()> {
     let seq = next_seq(&args.file)
         .with_context(|| format!("failed to inspect {}", args.file.display()))?;
-    let mut attrs = Map::new();
-    for key in GITHUB_ENV_ALLOWLIST {
-        if let Ok(value) = env::var(key) {
-            attrs.insert((*key).to_string(), Value::String(value));
-        }
-    }
+    let attrs = capture_env_allowlist(GITHUB_ENV_ALLOWLIST);
     append_new_event(AppendNewEvent {
         file: &args.file,
         seq,
@@ -456,6 +460,20 @@ fn github_context(args: CiGithubContextArgs) -> Result<()> {
         parent_span_id: None,
         duration_ms: None,
     })
+}
+
+fn capture_env_allowlist<K: AsRef<str>>(keys: &[K]) -> Map<String, Value> {
+    let mut attrs = Map::new();
+    for key in keys {
+        let key = key.as_ref();
+        if key.contains('=') || key.trim().is_empty() {
+            continue;
+        }
+        if let Ok(value) = env::var(key) {
+            attrs.insert(key.to_string(), Value::String(value));
+        }
+    }
+    attrs
 }
 
 const GITHUB_ENV_ALLOWLIST: &[&str] = &[
@@ -530,5 +548,23 @@ mod tests {
         assert_eq!(attrs["a"], 1);
         assert_eq!(attrs["b"], true);
         assert_eq!(attrs["c"], "text");
+    }
+
+    #[test]
+    fn capture_env_allowlist_ignores_assignment_like_names() {
+        unsafe {
+            env::set_var("RUNTRAIL_SAFE_ENV", "visible");
+        }
+        let captured = capture_env_allowlist(&[
+            "RUNTRAIL_SAFE_ENV".to_string(),
+            "SECRET_TOKEN=abc123".to_string(),
+            "".to_string(),
+        ]);
+        assert_eq!(captured["RUNTRAIL_SAFE_ENV"], "visible");
+        assert!(!captured.contains_key("SECRET_TOKEN"));
+        assert!(!captured.contains_key("SECRET_TOKEN=abc123"));
+        unsafe {
+            env::remove_var("RUNTRAIL_SAFE_ENV");
+        }
     }
 }
