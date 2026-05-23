@@ -231,9 +231,10 @@ The prompt includes failure evidence, recent command results, repository context
 
 ```bash
 runtrail validate --file .runtrail/events.jsonl
+runtrail validate --file .runtrail/events.jsonl --strict
 ```
 
-Validation checks JSONL framing, required fields, schema version, sequence numbers, timestamp parsing, levels, and trace/span ID format.
+Validation checks JSONL framing, required fields, schema version, sequence numbers, timestamp parsing, levels, and trace/span ID format. Strict mode also requires each event's `seq` to match its physical JSONL line number, which is useful for CI format hardening before sharing a trail.
 
 ### Generate shell completions
 

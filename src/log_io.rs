@@ -10,6 +10,12 @@ pub struct ValidationIssue {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValidationMode {
+    Default,
+    Strict,
+}
+
 pub fn append_event(path: &Path, event: &Event) -> Result<()> {
     event.validate().map_err(|message| anyhow!(message))?;
     if let Some(parent) = path.parent() {
@@ -48,6 +54,10 @@ pub fn read_events(path: &Path) -> Result<Vec<Event>> {
 }
 
 pub fn validate_file(path: &Path) -> Vec<ValidationIssue> {
+    validate_file_with_mode(path, ValidationMode::Default)
+}
+
+pub fn validate_file_with_mode(path: &Path, mode: ValidationMode) -> Vec<ValidationIssue> {
     let file = match fs::File::open(path) {
         Ok(file) => file,
         Err(err) => {
@@ -80,6 +90,12 @@ pub fn validate_file(path: &Path) -> Vec<ValidationIssue> {
                     issues.push(ValidationIssue {
                         line: line_number,
                         message,
+                    });
+                }
+                if mode == ValidationMode::Strict && event.seq != line_number as u64 {
+                    issues.push(ValidationIssue {
+                        line: line_number,
+                        message: format!("strict mode: seq must match line number {line_number}"),
                     });
                 }
             }

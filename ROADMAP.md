@@ -107,7 +107,7 @@ Goal: prepare the event format for a stable 1.0 promise.
 - Resolve the schema naming/versioning story and document compatibility rules clearly.
 - Add migration guidance for any pre-1.0 envelope differences.
 - Add golden tests for representative event logs.
-- Add stricter validation modes for CI use.
+- `runtrail validate --strict` for CI-focused format hardening.
 - Decide whether compact binary export is needed before 1.0 or should remain post-1.0.
 - Document producer/consumer compatibility expectations.
 

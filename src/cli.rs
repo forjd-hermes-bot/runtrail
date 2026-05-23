@@ -4,7 +4,7 @@ use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
 use crate::git;
 use crate::index;
-use crate::log_io::{append_event, next_seq, read_events, validate_file};
+use crate::log_io::{ValidationMode, append_event, next_seq, read_events, validate_file_with_mode};
 use crate::repair;
 use crate::replay;
 use crate::summary::{Summary, format_level};
@@ -32,7 +32,7 @@ enum Commands {
     /// Show recent events.
     Tail(TailArgs),
     /// Validate a JSONL event log.
-    Validate(FileArg),
+    Validate(ValidateArgs),
     /// Summarise an event log as Markdown.
     Summarise(SummariseArgs),
     /// Compare two event logs.
@@ -214,10 +214,13 @@ struct SummariseArgs {
 }
 
 #[derive(Debug, Parser)]
-struct FileArg {
+struct ValidateArgs {
     /// Log file path.
     #[arg(long, default_value = DEFAULT_LOG_FILE)]
     file: PathBuf,
+    /// Enforce deterministic format checks, including seq == physical line number.
+    #[arg(long)]
+    strict: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -293,7 +296,7 @@ pub fn run() -> Result<()> {
     match cli.command {
         Commands::Log(args) => log(args),
         Commands::Tail(args) => tail(args),
-        Commands::Validate(args) => validate(&args.file),
+        Commands::Validate(args) => validate(args),
         Commands::Summarise(args) => summarise(args),
         Commands::Diff(args) => diff(args),
         Commands::Ci(args) => ci(args),
@@ -615,10 +618,15 @@ const GITHUB_ENV_ALLOWLIST: &[&str] = &[
     "RUNNER_ARCH",
 ];
 
-fn validate(path: &Path) -> Result<()> {
-    let issues = validate_file(path);
+fn validate(args: ValidateArgs) -> Result<()> {
+    let mode = if args.strict {
+        ValidationMode::Strict
+    } else {
+        ValidationMode::Default
+    };
+    let issues = validate_file_with_mode(&args.file, mode);
     if issues.is_empty() {
-        println!("valid: {}", path.display());
+        println!("valid: {}", args.file.display());
         Ok(())
     } else {
         for issue in &issues {

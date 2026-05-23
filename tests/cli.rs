@@ -152,6 +152,73 @@ fn validate_reports_valid_and_invalid_logs() {
 }
 
 #[test]
+fn validate_strict_rejects_seq_that_does_not_match_line_number() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args([
+            "log",
+            "--file",
+            file.to_str().unwrap(),
+            "--event",
+            "agent.note",
+        ])
+        .assert()
+        .success();
+
+    let mut event: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    event["seq"] = Value::from(7);
+    std::fs::write(
+        &file,
+        format!("{}\n", serde_json::to_string(&event).unwrap()),
+    )
+    .unwrap();
+
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args(["validate", "--file", file.to_str().unwrap()])
+        .assert()
+        .success();
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args(["validate", "--file", file.to_str().unwrap(), "--strict"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "strict mode: seq must match line number 1",
+        ));
+}
+
+#[test]
+fn validate_strict_accepts_seq_that_matches_line_number() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    for idx in 0..2 {
+        Command::cargo_bin("runtrail")
+            .unwrap()
+            .args([
+                "log",
+                "--file",
+                file.to_str().unwrap(),
+                "--event",
+                "agent.note",
+                "--message",
+                &format!("msg-{idx}"),
+            ])
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args(["validate", "--file", file.to_str().unwrap(), "--strict"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("valid"));
+}
+
+#[test]
 fn summarise_outputs_counts_warnings_and_recent_events() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");
