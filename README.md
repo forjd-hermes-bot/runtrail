@@ -72,6 +72,15 @@ Generate a repair prompt for an agent:
 runtrail repair-prompt --file .runtrail/events.jsonl > repair.md
 ```
 
+Capture a GitHub Actions repair fixture:
+
+```bash
+runtrail ci capture --file .runtrail/events.jsonl
+runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
+```
+
+See [`docs/github-actions.md`](docs/github-actions.md) for a copy-paste workflow that uploads `.runtrail/` on CI failure.
+
 A typical failure-capture flow looks like this:
 
 ```bash
@@ -172,9 +181,10 @@ runtrail repo diff --stat-only
 
 ```bash
 runtrail ci github-context --file .runtrail/events.jsonl
+runtrail ci capture --file .runtrail/events.jsonl
 ```
 
-This records only a safe allowlist of environment variables:
+This records only a safe allowlist of environment variables. For full CI failure capture and artifact upload, see [`docs/github-actions.md`](docs/github-actions.md) and [`examples/github-actions-repair.yml`](examples/github-actions-repair.yml).
 
 - `GITHUB_WORKFLOW`
 - `GITHUB_RUN_ID`

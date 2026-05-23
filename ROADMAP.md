@@ -86,7 +86,7 @@ Goal: prepare the event format for a stable 1.0 promise.
 
 Goal: make runtrail easier to use repeatedly in real agent and CI workflows.
 
-- Add copy-paste GitHub Actions examples for:
+- Maintain and dogfood the copy-paste GitHub Actions repair workflow:
   - capturing a failed job,
   - uploading `.runtrail/` artifacts,
   - generating a repair prompt as a workflow artifact.
@@ -131,15 +131,11 @@ Goal: provide a stable CLI and schema that other tools can safely produce and co
    - Add additional edge-case JSONL fixtures under `examples/` or `tests/fixtures/`.
    - Validate them in unit/integration tests and strict mode where appropriate.
 
-3. **GitHub Actions repair workflow docs**
-   - Add a workflow snippet that captures `.runtrail/` on failure.
-   - Show how to upload trail artifacts and generate a repair prompt.
-
-4. **Large-log performance smoke**
+3. **Large-log performance smoke**
    - Add a script or test path for validating and summarising large synthetic trails.
    - Document expected local performance bounds.
 
-5. **Safe sharing guide**
+4. **Safe sharing guide**
    - Add a short checklist for reviewing trails before sharing in issues, PRs, or with agents.
    - Cover secrets, proprietary diffs, sensitive paths, and artifact retention.
 

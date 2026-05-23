@@ -1,0 +1,42 @@
+name: CI with runtrail repair fixture
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install runtrail
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run tests with runtrail evidence
+        run: |
+          runtrail ci github-context --file .runtrail/events.jsonl
+          runtrail repo snapshot --file .runtrail/events.jsonl
+          runtrail run --file .runtrail/events.jsonl -- cargo test
+
+      - name: Capture repair fixture
+        if: failure()
+        run: |
+          runtrail repo diff --file .runtrail/events.jsonl --stat-only
+          runtrail ci capture --file .runtrail/events.jsonl
+          runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
+          runtrail validate --file .runtrail/events.jsonl --strict
+
+      - name: Upload runtrail repair fixture
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtrail-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .runtrail/
+          if-no-files-found: error
