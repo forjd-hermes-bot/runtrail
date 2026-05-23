@@ -1,3 +1,4 @@
+use crate::ci_capture;
 use crate::command_run;
 use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
@@ -126,6 +127,18 @@ struct CiArgs {
 enum CiCommands {
     /// Capture safe GitHub Actions environment context.
     GithubContext(CiGithubContextArgs),
+    /// Capture a portable CI repair fixture.
+    Capture(CiCaptureArgs),
+}
+
+#[derive(Debug, Parser)]
+struct CiCaptureArgs {
+    /// Log file path.
+    #[arg(long, default_value = DEFAULT_LOG_FILE)]
+    file: PathBuf,
+    /// Repository working directory.
+    #[arg(long, default_value = ".")]
+    cwd: PathBuf,
 }
 
 #[derive(Debug, Parser)]
@@ -346,6 +359,7 @@ fn repair_prompt(args: RepairPromptArgs) -> Result<()> {
 fn ci(args: CiArgs) -> Result<()> {
     match args.command {
         CiCommands::GithubContext(args) => github_context(args),
+        CiCommands::Capture(args) => ci_capture(args),
     }
 }
 
@@ -441,6 +455,24 @@ fn run_command(args: RunArgs) -> Result<()> {
     } else {
         std::process::exit(result.exit_code);
     }
+}
+
+fn ci_capture(args: CiCaptureArgs) -> Result<()> {
+    let seq = next_seq(&args.file)
+        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
+    append_new_event(AppendNewEvent {
+        file: &args.file,
+        seq,
+        name: "ci.capture".to_string(),
+        level: Level::Info,
+        src: Some("runtrail".to_string()),
+        attrs: Map::new(),
+        body: ci_capture::capture_body(&args.cwd)?,
+        trace_id: None,
+        span_id: None,
+        parent_span_id: None,
+        duration_ms: None,
+    })
 }
 
 fn github_context(args: CiGithubContextArgs) -> Result<()> {

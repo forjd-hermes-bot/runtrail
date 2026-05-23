@@ -1,3 +1,4 @@
+pub mod ci_capture;
 pub mod cli;
 pub mod command_run;
 pub mod diff;

@@ -438,6 +438,58 @@ fn repair_prompt_outputs_agent_ready_markdown() {
 }
 
 #[test]
+fn ci_capture_logs_fixture_context_and_artifacts() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname='x'\n").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "Cargo.toml"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "initial"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args([
+            "ci",
+            "capture",
+            "--file",
+            file.to_str().unwrap(),
+            "--cwd",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    let stored: Value = serde_json::from_str(raw.trim()).unwrap();
+    assert_eq!(stored["event"], "ci.capture");
+    assert_eq!(stored["body"]["dependencies"]["rust"]["cargo_toml"], true);
+    assert_eq!(stored["body"]["artifacts"]["dir"], ".runtrail/artifacts");
+    assert!(dir.path().join(".runtrail/artifacts").exists());
+}
+
+#[test]
 fn completions_generates_shell_script() {
     Command::cargo_bin("runtrail")
         .unwrap()
