@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/forjd/runtrail/compare/runtrail-v0.3.0...runtrail-v0.4.0) (2026-05-24)
+
+
+### Features
+
+* add ci fixture capture ([add3d8d](https://github.com/forjd/runtrail/commit/add3d8dec43e851d4ac022183b769ba93de5779a))
+* add replay hints and repair filters ([cc5f933](https://github.com/forjd/runtrail/commit/cc5f9330d18789ed175e1a357eaf8a67e2f6531a))
+* add strict validation mode ([595ef95](https://github.com/forjd/runtrail/commit/595ef95920e5c786e8fd109008cafe1f7d13dda2))
+* add trail index and inspect commands ([6c68b07](https://github.com/forjd/runtrail/commit/6c68b0795d7ac75f5b9a5780470efa2a218d017e))
+* adopt runtrail schema identifier ([7811cb9](https://github.com/forjd/runtrail/commit/7811cb9c8187826adde17c6530a2ae4f95cc0fd3))
+* enrich safe capture metadata ([748e50d](https://github.com/forjd/runtrail/commit/748e50d180d2f0e029431fad3d7b02d5bc6a9655))
+* redact command output previews ([58dfeb6](https://github.com/forjd/runtrail/commit/58dfeb624ce395cd28876cb3385ea2a9529a6be7))
+
 ## [0.3.0](https://github.com/forjd/runtrail/compare/runtrail-v0.2.0...runtrail-v0.3.0) (2026-05-22)
 
 
