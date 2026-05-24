@@ -36,7 +36,9 @@ Optional environment variables:
 ```bash
 RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash install.sh         # required release tag
 RUNTRAIL_INSTALL_DIR=/usr/local/bin bash install.sh          # install directory
-RUNTRAIL_INSTALL_REPO=forjd/runtrail bash install.sh
+RUNTRAIL_INSTALL_REPO=forjd/runtrail bash install.sh         # alternate repo
+RUNTRAIL_INSTALL_TAG=latest RUNTRAIL_INSTALL_ALLOW_LATEST=1 bash install.sh
+RUNTRAIL_INSTALL_SKIP_CHECKSUM=1 bash install.sh             # explicit integrity opt-out
 ```
 
 Build from source:

@@ -2,7 +2,9 @@
 set -euo pipefail
 
 REPO="${RUNTRAIL_INSTALL_REPO:-forjd/runtrail}"
-TAG="${RUNTRAIL_INSTALL_TAG:-latest}"
+TAG="${RUNTRAIL_INSTALL_TAG:-}"
+ALLOW_LATEST="${RUNTRAIL_INSTALL_ALLOW_LATEST:-0}"
+SKIP_CHECKSUM="${RUNTRAIL_INSTALL_SKIP_CHECKSUM:-0}"
 BIN="runtrail"
 INSTALL_DIR="${RUNTRAIL_INSTALL_DIR:-${HOME}/.local/bin}"
 TMP_DIR="$(mktemp -d)"
@@ -24,12 +26,15 @@ usage() {
 Install runtrail.
 
 Environment variables:
-  RUNTRAIL_INSTALL_REPO  GitHub repo, default: forjd/runtrail
-  RUNTRAIL_INSTALL_TAG   Release tag, default: latest
-  RUNTRAIL_INSTALL_DIR   Install directory, default: ~/.local/bin
+  RUNTRAIL_INSTALL_TAG            Required immutable release tag, e.g. runtrail-v0.3.0
+  RUNTRAIL_INSTALL_REPO           GitHub repo, default: forjd/runtrail
+  RUNTRAIL_INSTALL_DIR            Install directory, default: ~/.local/bin
+  RUNTRAIL_INSTALL_ALLOW_LATEST=1 Allow the mutable latest release tag
+  RUNTRAIL_INSTALL_SKIP_CHECKSUM=1 Skip checksum verification if unavailable
 
 Example:
-  curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
+    | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
 USAGE
 }
 
@@ -38,10 +43,34 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   exit 0
 fi
 
+if [[ ! "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "error: invalid RUNTRAIL_INSTALL_REPO: $REPO" >&2
+  exit 1
+fi
+
+if [ -z "$TAG" ]; then
+  cat >&2 <<'EOF'
+error: RUNTRAIL_INSTALL_TAG is required so installs are tied to an immutable release.
+Set RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0, or set RUNTRAIL_INSTALL_ALLOW_LATEST=1 and RUNTRAIL_INSTALL_TAG=latest to opt into the moving latest release.
+EOF
+  exit 1
+fi
+
+if [[ ! "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "error: invalid RUNTRAIL_INSTALL_TAG: $TAG" >&2
+  exit 1
+fi
+
+if [ "$TAG" = "latest" ] && [ "$ALLOW_LATEST" != "1" ]; then
+  echo "error: refusing mutable latest release without RUNTRAIL_INSTALL_ALLOW_LATEST=1" >&2
+  exit 1
+fi
+
 need uname
 need tar
 need mktemp
 need chmod
+need grep
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m | tr '[:upper:]' '[:lower:]')"
@@ -78,6 +107,11 @@ case "$ARCH" in
     ;;
 esac
 
+if [ "$os_part" = "pc-windows-msvc" ] && [ "$arch_part" = "aarch64" ]; then
+  echo "error: Windows ARM64 release assets are not currently published" >&2
+  exit 1
+fi
+
 TARGET="${arch_part}-${os_part}"
 ASSET="runtrail-${TARGET}.${EXT}"
 BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
@@ -99,25 +133,40 @@ else
   exit 1
 fi
 
-echo "Installing runtrail ${TAG} for ${TARGET}..."
-fetch "$URL" "$ARCHIVE"
+verify_checksum() {
+  if [ "$SKIP_CHECKSUM" = "1" ]; then
+    echo "warning: RUNTRAIL_INSTALL_SKIP_CHECKSUM=1 set; skipping checksum verification" >&2
+    return
+  fi
 
-if fetch "$CHECKSUM_URL" "$CHECKSUMS"; then
+  if ! fetch "$CHECKSUM_URL" "$CHECKSUMS"; then
+    echo "error: checksums unavailable at ${CHECKSUM_URL}" >&2
+    echo "Set RUNTRAIL_INSTALL_SKIP_CHECKSUM=1 only if you accept this risk." >&2
+    exit 1
+  fi
+
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$TMP_DIR" && grep " ${ASSET}$" SHA256SUMS | sha256sum -c -)
+    (cd "$TMP_DIR" && grep -F " ${ASSET}" SHA256SUMS | sha256sum -c -)
   elif command -v shasum >/dev/null 2>&1; then
-    expected="$(grep " ${ASSET}$" "$CHECKSUMS" | awk '{print $1}')"
-    actual="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
-    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    local line expected actual
+    line="$(grep -F " ${ASSET}" "$CHECKSUMS" || true)"
+    expected="${line%% *}"
+    actual="$(shasum -a 256 "$ARCHIVE")"
+    actual="${actual%% *}"
+    if [ -z "$line" ] || [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
       echo "error: checksum mismatch for ${ASSET}" >&2
       exit 1
     fi
   else
-    echo "warning: sha256sum/shasum unavailable; skipping checksum verification" >&2
+    echo "error: sha256sum/shasum unavailable; cannot verify ${ASSET}" >&2
+    echo "Set RUNTRAIL_INSTALL_SKIP_CHECKSUM=1 only if you accept this risk." >&2
+    exit 1
   fi
-else
-  echo "warning: checksums unavailable; skipping checksum verification" >&2
-fi
+}
+
+echo "Installing runtrail ${TAG} for ${TARGET}..."
+fetch "$URL" "$ARCHIVE"
+verify_checksum
 
 case "$EXT" in
   tar.gz)
