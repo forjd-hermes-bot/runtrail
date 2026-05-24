@@ -162,8 +162,11 @@ struct RepoDiffArgs {
     /// Repository working directory.
     #[arg(long, default_value = ".")]
     cwd: PathBuf,
-    /// Omit full patch and record only diff --stat.
+    /// Include full patch content. By default only diff stats are recorded.
     #[arg(long)]
+    patch: bool,
+    /// Deprecated: diff stats are the default; retained for compatibility.
+    #[arg(long, hide = true)]
     stat_only: bool,
 }
 
@@ -479,7 +482,7 @@ fn repo_snapshot(args: RepoSnapshotArgs) -> Result<()> {
 }
 
 fn repo_diff(args: RepoDiffArgs) -> Result<()> {
-    let body = git::diff_body(&args.cwd, args.stat_only)?;
+    let body = git::diff_body(&args.cwd, !args.patch || args.stat_only)?;
     append_new_event(AppendNewEvent {
         file: &args.file,
         name: "repo.diff".to_string(),

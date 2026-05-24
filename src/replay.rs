@@ -13,17 +13,24 @@ pub fn hints(events: &[Event]) -> Vec<ReplayHint> {
         .iter()
         .filter(|event| event.event == "command.end")
         .filter_map(|event| {
-            let command = event
-                .body
-                .get("cmd")
-                .and_then(|value| value.as_array())?
-                .iter()
-                .filter_map(|part| part.as_str().map(str::to_string))
-                .collect::<Vec<_>>();
-            if command.is_empty() {
+            let parts = event.body.get("cmd")?.as_array()?;
+            let mut command = Vec::new();
+            let mut non_string = false;
+            for part in parts {
+                if let Some(part) = part.as_str() {
+                    command.push(part.to_string());
+                } else {
+                    non_string = true;
+                }
+            }
+            if command.is_empty() && !non_string {
                 return None;
             }
-            let unsupported_reason = unsupported_reason(&command);
+            let unsupported_reason = if non_string {
+                Some("command contains non-string arguments that cannot be replayed".to_string())
+            } else {
+                unsupported_reason(&command)
+            };
             Some(ReplayHint {
                 command,
                 supported: unsupported_reason.is_none(),
@@ -47,7 +54,12 @@ pub fn to_markdown(hints: &[ReplayHint]) -> String {
         } else {
             "partial"
         };
-        output.push_str(&format!("- `{}` — {status}", shell_join(&hint.command)));
+        let rendered = if hint.command.is_empty() {
+            "<unrenderable command>".to_string()
+        } else {
+            shell_join(&hint.command)
+        };
+        output.push_str(&format!("- `{rendered}` — {status}"));
         if let Some(reason) = &hint.unsupported_reason {
             output.push_str(&format!(" ({reason})"));
         }
@@ -77,7 +89,9 @@ fn shell_join(command: &[String]) -> String {
     command
         .iter()
         .map(|part| {
-            if part
+            if part.is_empty() {
+                "''".to_string()
+            } else if part
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
             {
@@ -94,26 +108,51 @@ fn shell_join(command: &[String]) -> String {
 mod tests {
     use super::*;
     use crate::event::{Event, Level, NewEvent};
-    use serde_json::{Map, json};
+    use serde_json::{Map, Value, json};
 
-    #[test]
-    fn hints_include_supported_and_partial_metadata() {
-        let event = Event::new(NewEvent {
+    fn command_event(cmd: Value) -> Event {
+        Event::new(NewEvent {
             seq: 1,
             event: "command.end".to_string(),
             level: Level::Error,
             src: Some("runtrail".to_string()),
             attrs: Map::new(),
-            body: json!({"cmd":["cargo","test"],"exit_code":101}),
+            body: json!({"cmd": cmd,"exit_code":101}),
             trace_id: None,
             span_id: None,
             parent_span_id: None,
             duration_ms: None,
-        });
-        let hints = hints(&[event]);
+        })
+    }
+
+    #[test]
+    fn hints_include_supported_and_partial_metadata() {
+        let hints = hints(&[command_event(json!(["cargo", "test"]))]);
         assert_eq!(hints.len(), 1);
         assert!(hints[0].supported);
         assert!(!hints[0].partial);
         assert!(to_markdown(&hints).contains("cargo test"));
+    }
+
+    #[test]
+    fn hints_preserve_empty_string_args() {
+        let hints = hints(&[command_event(json!(["printf", ""]))]);
+        assert_eq!(hints[0].command, vec!["printf", ""]);
+        assert!(to_markdown(&hints).contains("printf ''"));
+    }
+
+    #[test]
+    fn hints_report_non_string_args_as_partial() {
+        let hints = hints(&[command_event(json!(["tool", 7]))]);
+        assert_eq!(hints.len(), 1);
+        assert!(!hints[0].supported);
+        assert!(hints[0].partial);
+        assert!(
+            hints[0]
+                .unsupported_reason
+                .as_ref()
+                .unwrap()
+                .contains("non-string")
+        );
     }
 }

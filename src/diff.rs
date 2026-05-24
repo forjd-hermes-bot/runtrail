@@ -10,13 +10,22 @@ pub struct LogDiff {
     pub after_counts: BTreeMap<String, usize>,
     pub added: Vec<Event>,
     pub removed: Vec<Event>,
+    pub changed: Vec<(Event, Event)>,
     pub new_warnings_and_errors: Vec<Event>,
 }
 
 impl LogDiff {
     pub fn between(before: &[Event], after: &[Event]) -> Self {
-        let before_ids: BTreeSet<_> = before.iter().map(|event| event.id.as_str()).collect();
-        let after_ids: BTreeSet<_> = after.iter().map(|event| event.id.as_str()).collect();
+        let before_by_id = before
+            .iter()
+            .map(|event| (event.id.as_str(), event))
+            .collect::<BTreeMap<_, _>>();
+        let after_by_id = after
+            .iter()
+            .map(|event| (event.id.as_str(), event))
+            .collect::<BTreeMap<_, _>>();
+        let before_ids = before_by_id.keys().copied().collect::<BTreeSet<_>>();
+        let after_ids = after_by_id.keys().copied().collect::<BTreeSet<_>>();
         let added: Vec<Event> = after
             .iter()
             .filter(|event| !before_ids.contains(event.id.as_str()))
@@ -27,10 +36,26 @@ impl LogDiff {
             .filter(|event| !after_ids.contains(event.id.as_str()))
             .cloned()
             .collect();
+        let changed = before_ids
+            .intersection(&after_ids)
+            .filter_map(|id| {
+                let before_event = before_by_id[id];
+                let after_event = after_by_id[id];
+                (before_event != after_event).then(|| (before_event.clone(), after_event.clone()))
+            })
+            .collect::<Vec<_>>();
+        let changed_new_warnings = changed
+            .iter()
+            .filter(|(before, after)| {
+                !matches!(before.level, Level::Warn | Level::Error)
+                    && matches!(after.level, Level::Warn | Level::Error)
+            })
+            .map(|(_, after)| after.clone());
         let new_warnings_and_errors = added
             .iter()
             .filter(|event| matches!(event.level, Level::Warn | Level::Error))
             .cloned()
+            .chain(changed_new_warnings)
             .collect();
         Self {
             before_total: before.len(),
@@ -39,6 +64,7 @@ impl LogDiff {
             after_counts: counts(after),
             added,
             removed,
+            changed,
             new_warnings_and_errors,
         }
     }
@@ -72,6 +98,7 @@ impl LogDiff {
         }
         render_events(&mut out, "Added events", &self.added);
         render_events(&mut out, "Removed events", &self.removed);
+        render_changed_events(&mut out, "Changed events", &self.changed);
         render_events(
             &mut out,
             "New warnings and errors",
@@ -102,6 +129,27 @@ fn render_events(out: &mut String, title: &str, events: &[Event]) {
                 format_level(&event.level),
                 event.event,
                 preview(&event.body)
+            ));
+        }
+    }
+}
+
+fn render_changed_events(out: &mut String, title: &str, events: &[(Event, Event)]) {
+    out.push_str(&format!("\n## {title}\n\n"));
+    if events.is_empty() {
+        out.push_str("- none\n");
+    } else {
+        for (before, after) in events {
+            out.push_str(&format!(
+                "- `{}` #{}→#{} `{}`→`{}` {} — {} → {}\n",
+                after.id,
+                before.seq,
+                after.seq,
+                format_level(&before.level),
+                format_level(&after.level),
+                after.event,
+                preview(&before.body),
+                preview(&after.body)
             ));
         }
     }
@@ -138,5 +186,20 @@ mod tests {
         assert_eq!(diff.removed.len(), 1);
         assert_eq!(diff.new_warnings_and_errors.len(), 1);
         assert!(diff.to_markdown().contains("New warnings and errors"));
+    }
+
+    #[test]
+    fn diff_finds_changed_events_with_same_id() {
+        let before = event(1, "agent.note", Level::Info);
+        let mut after = before.clone();
+        after.level = Level::Error;
+        after.body = json!({"error":"changed"});
+
+        let diff = LogDiff::between(&[before], &[after]);
+        assert_eq!(diff.added.len(), 0);
+        assert_eq!(diff.removed.len(), 0);
+        assert_eq!(diff.changed.len(), 1);
+        assert_eq!(diff.new_warnings_and_errors.len(), 1);
+        assert!(diff.to_markdown().contains("Changed events"));
     }
 }

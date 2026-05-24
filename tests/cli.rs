@@ -406,7 +406,7 @@ fn repo_snapshot_logs_git_status() {
 }
 
 #[test]
-fn repo_diff_logs_stat_and_patch() {
+fn repo_diff_logs_stat_and_patch_when_requested() {
     let repo = init_git_repo();
     let file = repo.path().join("events.jsonl");
     std::fs::write(repo.path().join("README.md"), "hello world").unwrap();
@@ -419,6 +419,7 @@ fn repo_diff_logs_stat_and_patch() {
             repo.path().to_str().unwrap(),
             "--file",
             file.to_str().unwrap(),
+            "--patch",
         ])
         .assert()
         .success();
@@ -437,6 +438,47 @@ fn repo_diff_logs_stat_and_patch() {
             .as_str()
             .unwrap()
             .contains("hello world")
+    );
+}
+
+#[test]
+fn repo_diff_logs_staged_only_changes_without_patch_by_default() {
+    let repo = init_git_repo();
+    let file = repo.path().join("events.jsonl");
+    std::fs::write(repo.path().join("README.md"), "hello staged").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(repo.path())
+        .status()
+        .unwrap();
+
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args([
+            "repo",
+            "diff",
+            "--cwd",
+            repo.path().to_str().unwrap(),
+            "--file",
+            file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    let stored: Value = serde_json::from_str(raw.trim()).unwrap();
+    assert!(
+        stored["body"]["stat"]
+            .as_str()
+            .unwrap()
+            .contains("README.md")
+    );
+    assert!(stored["body"]["patch"].is_null());
+    assert!(
+        stored["body"]["staged"]["stat"]
+            .as_str()
+            .unwrap()
+            .contains("README.md")
     );
 }
 

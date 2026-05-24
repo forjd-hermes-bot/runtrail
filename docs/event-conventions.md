@@ -46,6 +46,6 @@ runtrail repair-prompt --event browser.assertion --level error
 
 1. Log `agent.tool.start` before long-running commands or browser actions.
 2. Log `agent.tool.end` with redacted previews and `duration_ms`.
-3. Log `repo.snapshot` and `repo.diff --stat-only` before requesting review.
+3. Log `repo.snapshot` and the default stat-only `repo.diff` before requesting review.
 4. Attach artifacts under `.runtrail/artifacts/` and reference paths from JSONL events.
 5. Use `runtrail inspect --event agent.tool.end` to skim the run.

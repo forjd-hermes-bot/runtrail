@@ -9,7 +9,7 @@ The current schema identifier is `runtrail.v1`. Earlier design notes used an int
 | Field | Type | Required | Description |
 |---|---:|---:|---|
 | `schema` | string | yes | Current schema identifier. Must be `runtrail.v1`. |
-| `id` | string | yes | ULID for stable identity across copied logs. |
+| `id` | string | yes | 26-character ULID for stable identity across copied logs. |
 | `seq` | integer | yes | 1-based sequence number within the file. |
 | `ts` | string | yes | RFC3339 UTC timestamp. |
 | `event` | string | yes | Dot-separated event name such as `command.end`. |
@@ -34,7 +34,7 @@ Freeform note from a human or agent.
 
 ### `command.start`
 
-Emitted by `runtrail run` before the child command output is recorded.
+Emitted by `runtrail run` before the child command is spawned, so hangs and spawn failures still leave lifecycle evidence.
 
 Body fields:
 
@@ -50,8 +50,9 @@ Body fields:
 
 - `cmd`: array of command/argument strings
 - `cwd`: working directory
-- `exit_code`: process exit code, or `128` if terminated without a code
+- `exit_code`: process exit code, `128 + signal` on Unix signal termination, or `127` for spawn failures
 - `success`: boolean
+- `spawn_error`: optional spawn failure message
 - `duration_ms`: elapsed command time
 - `stdout_preview`: UTF-8 lossy stdout preview
 - `stderr_preview`: UTF-8 lossy stderr preview
@@ -82,8 +83,10 @@ Body fields:
 - `branch`
 - `head`
 - `dirty`
-- `stat`: `git diff --stat`
-- `patch`: `git diff --patch`, or `null` when `--stat-only` is used
+- `stat`: combined unstaged and staged diff stats
+- `patch`: combined unstaged and staged patches, or `null` unless `runtrail repo diff --patch` is used
+- `unstaged`: object containing `stat` and optional `patch`
+- `staged`: object containing `stat` and optional `patch`
 
 ### `ci.github.context`
 
@@ -99,7 +102,8 @@ Emitted by `runtrail ci capture` to create a portable repair fixture with safe C
 - Readers should ignore unknown top-level fields.
 - Event-specific `body` payloads may grow additively.
 - `attrs` should remain small and mostly scalar; large evidence belongs in `body` or referenced artifacts.
-- Secrets must not be written into logs. Prefer allowlists over denylists.
+- Required fields are strict in v1: `level`, `attrs`, and `body` must be present even when they are `"info"`, `{}`, or another empty JSON value.
+- `runtrail` applies best-effort redaction to command argv, attrs, stdout/stderr previews, and string values in event bodies. Producers should still prefer allowlists over denylists and avoid writing secrets.
 - Strict validation additionally requires `seq` to match the physical JSONL line number.
 
 ## Migration notes

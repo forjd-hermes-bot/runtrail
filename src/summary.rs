@@ -109,13 +109,21 @@ pub fn format_level(level: &Level) -> &'static str {
 }
 
 pub fn preview(body: &Value) -> String {
-    if let Some(message) = body.get("message").and_then(Value::as_str) {
-        return truncate(message);
-    }
-    if let Some(error) = body.get("error").and_then(Value::as_str) {
-        return truncate(error);
-    }
-    truncate(&serde_json::to_string(body).unwrap_or_else(|_| "<unrenderable>".to_string()))
+    let rendered = if let Some(message) = body.get("message").and_then(Value::as_str) {
+        message.to_string()
+    } else if let Some(error) = body.get("error").and_then(Value::as_str) {
+        error.to_string()
+    } else {
+        serde_json::to_string(body).unwrap_or_else(|_| "<unrenderable>".to_string())
+    };
+    sanitize_inline(&truncate(&rendered))
+}
+
+fn sanitize_inline(value: &str) -> String {
+    value
+        .replace('\r', "\\r")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t")
 }
 
 fn truncate(value: &str) -> String {
@@ -163,5 +171,11 @@ mod tests {
         let markdown = summary.to_markdown();
         assert!(markdown.contains("Total events: 2"));
         assert!(markdown.contains("boom"));
+    }
+
+    #[test]
+    fn summary_preview_escapes_multiline_messages() {
+        let rendered = preview(&json!({"message":"first\n- forged"}));
+        assert_eq!(rendered, "first\\n- forged");
     }
 }

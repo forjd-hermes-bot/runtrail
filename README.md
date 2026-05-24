@@ -22,19 +22,20 @@ Coding agents are most useful when failures arrive with portable context instead
 
 ## Install
 
-Install the latest binary from GitHub releases:
+Install an immutable release tag from GitHub releases:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
+  | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
 ```
 
-The installer detects OS/architecture, downloads the matching release asset, verifies `SHA256SUMS` when available, and installs to `~/.local/bin` by default.
+The installer detects OS/architecture, downloads the matching release asset, requires `SHA256SUMS` verification by default, and installs to `~/.local/bin`.
 
 Optional environment variables:
 
 ```bash
+RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash install.sh         # required release tag
 RUNTRAIL_INSTALL_DIR=/usr/local/bin bash install.sh          # install directory
-RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash install.sh         # release tag
 RUNTRAIL_INSTALL_REPO=forjd/runtrail bash install.sh
 ```
 
@@ -57,7 +58,7 @@ Add repository context:
 
 ```bash
 runtrail repo snapshot
-runtrail repo diff --stat-only
+runtrail repo diff
 ```
 
 Summarise the trail:
@@ -79,14 +80,14 @@ runtrail ci capture --file .runtrail/events.jsonl
 runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
 ```
 
-See [`docs/github-actions.md`](docs/github-actions.md) for a copy-paste workflow that uploads `.runtrail/` on CI failure.
+See [`docs/github-actions.md`](docs/github-actions.md) for a copy-paste workflow that uploads enumerated runtrail repair files on CI failure.
 
 A typical failure-capture flow looks like this:
 
 ```bash
 runtrail repo snapshot
 runtrail run -- cargo test
-runtrail repo diff --stat-only
+runtrail repo diff
 runtrail repair-prompt --file .runtrail/events.jsonl > repair.md
 ```
 
@@ -103,19 +104,19 @@ Required envelope fields:
 | Field | Meaning |
 | --- | --- |
 | `schema` | Schema identifier. Current schema is `runtrail.v1`. |
-| `id` | Event ULID. |
+| `id` | 26-character event ULID. |
 | `seq` | Positive sequence number within the log file. |
 | `ts` | RFC3339 UTC timestamp. |
 | `event` | Dotted event name, for example `command.end`. |
 
-Common optional fields:
+Additional envelope fields:
 
 | Field | Meaning |
 | --- | --- |
-| `level` | `trace`, `debug`, `info`, `warn`, or `error`. |
-| `src` | Event source, for example `runtrail`, `hermes-agent`, or `github-actions`. |
-| `attrs` | Small structured metadata useful for filtering. |
-| `body` | Event-specific JSON payload. |
+| `level` | Required severity: `trace`, `debug`, `info`, `warn`, or `error`. |
+| `src` | Optional event source, for example `runtrail`, `hermes-agent`, or `github-actions`. |
+| `attrs` | Required small structured metadata object useful for filtering. Use `{}` when empty. |
+| `body` | Required event-specific JSON payload. Use `{}` when empty. |
 | `trace_id`, `span_id`, `parent_span_id` | Optional trace correlation fields. |
 | `duration_ms` | Optional duration in milliseconds. |
 
@@ -155,7 +156,7 @@ runtrail log \
 
 ```bash
 runtrail run -- cargo test
-runtrail run --file .runtrail/events.jsonl --cwd . --preview-bytes 4096 -- npm test
+runtrail run --file .runtrail/events.jsonl --cwd . --preview-bytes 4096 --env CI -- npm test
 ```
 
 `runtrail run` emits:
@@ -163,19 +164,19 @@ runtrail run --file .runtrail/events.jsonl --cwd . --preview-bytes 4096 -- npm t
 - `command.start`
 - `command.end`
 
-The wrapper exits with the child command's exit code. Stdout/stderr are stored as bounded previews so logs stay portable.
+The wrapper logs `command.start` before spawning the child and exits with the child command's exit code. Stdout/stderr are streamed into bounded previews so logs stay portable.
 
 ### Capture repository evidence
 
 ```bash
 runtrail repo snapshot
 runtrail repo diff
-runtrail repo diff --stat-only
+runtrail repo diff --patch
 ```
 
 `repo snapshot` captures branch, HEAD, dirty state, and `git status --porcelain` file entries.
 
-`repo diff` captures `git diff --stat` plus the patch unless `--stat-only` is used.
+`repo diff` captures staged and unstaged diff stats by default. Use `--patch` only when full patch content is safe to store.
 
 ### Capture GitHub Actions context
 
@@ -227,7 +228,7 @@ The summary includes:
 runtrail diff before.jsonl after.jsonl
 ```
 
-The diff reports count deltas, added/removed event IDs, and newly introduced warnings/errors.
+The diff reports count deltas, added/removed/changed event IDs, and newly introduced warnings/errors.
 
 ### Generate an agent repair prompt
 
@@ -236,6 +237,16 @@ runtrail repair-prompt --file .runtrail/events.jsonl
 ```
 
 The prompt includes failure evidence, recent command results, repository context when present, suspected causes, and safe commands to try.
+
+### Build an index, inspect, and replay
+
+```bash
+runtrail index --file .runtrail/events.jsonl
+runtrail inspect --file .runtrail/events.jsonl --lines 20
+runtrail replay --file .runtrail/events.jsonl
+```
+
+`index` emits compact JSON query fields, `inspect` shows recent human-readable events, and `replay` prints conservative command hints.
 
 ### Validate a log
 
@@ -285,8 +296,9 @@ Use `runtrail validate` when you want stricter checks before storing or sharing 
 `runtrail` records what you ask it to record. A few guardrails are built in:
 
 - command stdout/stderr are captured as bounded previews, not unbounded logs;
+- command argv, attrs, and string body values receive best-effort redaction for common token/password patterns;
 - GitHub Actions context uses a fixed safe allowlist;
-- repo diff capture is explicit, and `--stat-only` avoids storing full patches;
+- repo diff stores stats by default, and `--patch` is an explicit full-patch opt-in;
 - logs are local files, so you decide if and where to upload them.
 
 Before sharing logs publicly, review `.runtrail/events.jsonl` for secrets, tokens, proprietary patches, or sensitive paths.
@@ -295,9 +307,9 @@ Before sharing logs publicly, review `.runtrail/events.jsonl` for secrets, token
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-scripts/perf-smoke.sh 1000
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+scripts/perf-smoke.sh 10000
 ```
 
 Release automation is handled by Release Please and GitHub Actions. Binary builds are published for Linux, macOS, and Windows release targets.

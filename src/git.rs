@@ -37,11 +37,22 @@ pub fn snapshot_body(cwd: &Path) -> Result<Value> {
 
 pub fn diff_body(cwd: &Path, stat_only: bool) -> Result<Value> {
     let context = git_context(cwd)?;
-    let stat = git_output(cwd, ["diff", "--stat"])?;
-    let diff = if stat_only {
-        None
+    let unstaged_stat = git_output(cwd, ["diff", "--stat"])?;
+    let staged_stat = git_output(cwd, ["diff", "--cached", "--stat"])?;
+    let stat = combine_git_outputs(&[
+        ("unstaged", unstaged_stat.as_str()),
+        ("staged", staged_stat.as_str()),
+    ]);
+    let (unstaged_patch, staged_patch, patch) = if stat_only {
+        (None, None, None)
     } else {
-        Some(git_output(cwd, ["diff", "--patch"])?)
+        let unstaged_patch = git_output(cwd, ["diff", "--patch"])?;
+        let staged_patch = git_output(cwd, ["diff", "--cached", "--patch"])?;
+        let patch = combine_git_outputs(&[
+            ("unstaged", unstaged_patch.as_str()),
+            ("staged", staged_patch.as_str()),
+        ]);
+        (Some(unstaged_patch), Some(staged_patch), Some(patch))
     };
     Ok(json!({
         "repo_root": context.root,
@@ -49,8 +60,34 @@ pub fn diff_body(cwd: &Path, stat_only: bool) -> Result<Value> {
         "head": context.head,
         "dirty": context.dirty,
         "stat": stat,
-        "patch": diff,
+        "patch": patch,
+        "unstaged": {
+            "stat": unstaged_stat,
+            "patch": unstaged_patch,
+        },
+        "staged": {
+            "stat": staged_stat,
+            "patch": staged_patch,
+        }
     }))
+}
+
+fn combine_git_outputs(sections: &[(&str, &str)]) -> String {
+    let non_empty = sections
+        .iter()
+        .filter(|(_, body)| !body.trim().is_empty())
+        .collect::<Vec<_>>();
+    if non_empty.is_empty() {
+        return String::new();
+    }
+    if non_empty.len() == 1 {
+        return non_empty[0].1.to_string();
+    }
+    non_empty
+        .into_iter()
+        .map(|(name, body)| format!("# {name}\n{body}"))
+        .collect::<Vec<_>>()
+        .join("\n\n")
 }
 
 fn git_context(cwd: &Path) -> Result<GitContext> {
@@ -81,14 +118,27 @@ fn normalized_remote_url(cwd: &Path) -> Result<String> {
 }
 
 fn normalize_remote_url(url: &str) -> String {
-    let without_credentials = if let Some((scheme, rest)) = url.split_once("://") {
+    let trimmed = url.trim();
+    let without_query = trimmed
+        .split(['?', '#'])
+        .next()
+        .unwrap_or(trimmed)
+        .to_string();
+    let without_credentials = if let Some((scheme, rest)) = without_query.split_once("://") {
         if let Some(at) = rest.rfind('@') {
             format!("{scheme}://{}", &rest[at + 1..])
         } else {
-            url.to_string()
+            without_query
+        }
+    } else if let Some(at) = without_query.rfind('@') {
+        let prefix = &without_query[..at];
+        if prefix.contains(':') && !prefix.eq_ignore_ascii_case("git") {
+            without_query[at + 1..].to_string()
+        } else {
+            without_query
         }
     } else {
-        url.to_string()
+        without_query
     };
     without_credentials.trim_end_matches(".git").to_string()
 }
@@ -140,8 +190,7 @@ mod tests {
         assert!(status.success());
     }
 
-    #[test]
-    fn snapshot_body_reports_dirty_files() {
+    fn init_repo() -> tempfile::TempDir {
         let dir = tempdir().unwrap();
         git(dir.path(), &["init"]);
         git(dir.path(), &["config", "user.email", "test@example.com"]);
@@ -149,6 +198,12 @@ mod tests {
         fs::write(dir.path().join("README.md"), "hello").unwrap();
         git(dir.path(), &["add", "README.md"]);
         git(dir.path(), &["commit", "-m", "initial"]);
+        dir
+    }
+
+    #[test]
+    fn snapshot_body_reports_dirty_files() {
+        let dir = init_repo();
         fs::write(dir.path().join("README.md"), "hello world").unwrap();
 
         let body = snapshot_body(dir.path()).unwrap();
@@ -158,10 +213,46 @@ mod tests {
     }
 
     #[test]
-    fn normalize_remote_url_strips_credentials_and_git_suffix() {
+    fn diff_body_reports_staged_only_changes() {
+        let dir = init_repo();
+        fs::write(dir.path().join("README.md"), "hello staged").unwrap();
+        git(dir.path(), &["add", "README.md"]);
+
+        let body = diff_body(dir.path(), false).unwrap();
+        assert_eq!(body["dirty"], true);
+        assert!(body["stat"].as_str().unwrap().contains("README.md"));
+        assert!(
+            body["staged"]["stat"]
+                .as_str()
+                .unwrap()
+                .contains("README.md")
+        );
+        assert_eq!(body["unstaged"]["stat"], "");
+        assert!(body["patch"].as_str().unwrap().contains("hello staged"));
+    }
+
+    #[test]
+    fn diff_body_can_omit_patches() {
+        let dir = init_repo();
+        fs::write(dir.path().join("README.md"), "hello world").unwrap();
+
+        let body = diff_body(dir.path(), true).unwrap();
+        assert!(body["stat"].as_str().unwrap().contains("README.md"));
+        assert!(body["patch"].is_null());
+        assert!(body["unstaged"]["patch"].is_null());
+    }
+
+    #[test]
+    fn normalize_remote_url_strips_credentials_query_fragment_and_git_suffix() {
         assert_eq!(
-            normalize_remote_url("https://user:secret@github.com/forjd/runtrail.git"),
+            normalize_remote_url(
+                "https://user:secret@github.com/forjd/runtrail.git?token=abc#frag"
+            ),
             "https://github.com/forjd/runtrail"
+        );
+        assert_eq!(
+            normalize_remote_url("user:secret@github.com/forjd/runtrail.git"),
+            "github.com/forjd/runtrail"
         );
         assert_eq!(
             normalize_remote_url("git@github.com:forjd/runtrail.git"),

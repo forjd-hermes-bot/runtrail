@@ -12,11 +12,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Install runtrail
         run: |
-          curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
+            | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run tests with runtrail evidence
@@ -28,7 +31,7 @@ jobs:
       - name: Capture repair fixture
         if: failure()
         run: |
-          runtrail repo diff --file .runtrail/events.jsonl --stat-only
+          runtrail repo diff --file .runtrail/events.jsonl
           runtrail ci capture --file .runtrail/events.jsonl
           runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
           runtrail validate --file .runtrail/events.jsonl --strict
@@ -38,5 +41,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: runtrail-repair-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .runtrail/
+          path: |
+            .runtrail/events.jsonl
+            .runtrail/repair.md
           if-no-files-found: error
+          retention-days: 7

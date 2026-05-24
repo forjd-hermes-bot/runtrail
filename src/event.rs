@@ -16,20 +16,17 @@ pub enum Level {
 
 pub const SCHEMA: &str = "runtrail.v1";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Event {
     pub schema: String,
     pub id: String,
     pub seq: u64,
     pub ts: String,
     pub event: String,
-    #[serde(default)]
     pub level: Level,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub src: Option<String>,
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub attrs: Map<String, Value>,
-    #[serde(default = "default_body")]
     pub body: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
@@ -39,10 +36,6 @@ pub struct Event {
     pub parent_span_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u64>,
-}
-
-fn default_body() -> Value {
-    Value::Object(Map::new())
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +79,9 @@ impl Event {
         }
         if self.id.trim().is_empty() {
             return Err("id is required".to_string());
+        }
+        if self.id.parse::<Ulid>().is_err() {
+            return Err("id must be a valid ULID".to_string());
         }
         if self.seq == 0 {
             return Err("seq must be a positive integer".to_string());
@@ -166,6 +162,13 @@ mod tests {
         let mut event = new_event(1, "agent.note");
         event.schema = "cel.v1".to_string();
         assert_eq!(event.validate().unwrap_err(), "unsupported schema cel.v1");
+    }
+
+    #[test]
+    fn invalid_ulid_fails_validation() {
+        let mut event = new_event(1, "agent.note");
+        event.id = "not-a-ulid".to_string();
+        assert_eq!(event.validate().unwrap_err(), "id must be a valid ULID");
     }
 
     #[test]

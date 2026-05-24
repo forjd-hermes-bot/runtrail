@@ -15,7 +15,7 @@ Use this pattern when your workflow already runs tests or builds and you only wa
     mkdir -p .runtrail
     runtrail ci github-context --file .runtrail/events.jsonl
     runtrail repo snapshot --file .runtrail/events.jsonl
-    runtrail repo diff --file .runtrail/events.jsonl --stat-only
+    runtrail repo diff --file .runtrail/events.jsonl
     runtrail ci capture --file .runtrail/events.jsonl
     runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
 
@@ -24,15 +24,18 @@ Use this pattern when your workflow already runs tests or builds and you only wa
   uses: actions/upload-artifact@v4
   with:
     name: runtrail-repair-${{ github.run_id }}-${{ github.run_attempt }}
-    path: .runtrail/
+    path: |
+      .runtrail/events.jsonl
+      .runtrail/repair.md
     if-no-files-found: error
+    retention-days: 7
 ```
 
 Use `if: failure()` for normal jobs so successful runs do not upload artifacts. Use `if: always()` only when you explicitly want a trail for both success and failure.
 
 ## Complete Rust workflow example
 
-This example installs `runtrail`, records the test command with bounded stdout/stderr previews, generates a repair prompt on failure, and uploads the full `.runtrail/` directory as an artifact.
+This example installs `runtrail`, records the test command with bounded stdout/stderr previews, generates a repair prompt on failure, and uploads enumerated repair files as an artifact.
 
 ```yaml
 name: CI
@@ -49,11 +52,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Install runtrail
         run: |
-          curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
+            | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run tests with runtrail evidence
@@ -65,7 +71,7 @@ jobs:
       - name: Capture repair fixture
         if: failure()
         run: |
-          runtrail repo diff --file .runtrail/events.jsonl --stat-only
+          runtrail repo diff --file .runtrail/events.jsonl
           runtrail ci capture --file .runtrail/events.jsonl
           runtrail repair-prompt --file .runtrail/events.jsonl > .runtrail/repair.md
           runtrail validate --file .runtrail/events.jsonl --strict
@@ -75,8 +81,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: runtrail-repair-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .runtrail/
+          path: |
+            .runtrail/events.jsonl
+            .runtrail/repair.md
           if-no-files-found: error
+          retention-days: 7
 ```
 
 ## What the artifact contains
@@ -85,7 +94,7 @@ A repair fixture normally contains:
 
 - `.runtrail/events.jsonl` — canonical event trail.
 - `.runtrail/repair.md` — Markdown prompt for humans or agents.
-- `.runtrail/artifacts/` — optional derived artifacts and metadata from `runtrail ci capture`.
+- `.runtrail/artifacts/` — optional derived artifacts and metadata from `runtrail ci capture`; upload individual files from this directory only after review.
 
 The trail may include:
 
@@ -107,7 +116,7 @@ Before sharing a fixture outside your trusted team, check for:
 - credentials or tokens inside application logs;
 - oversized artifacts that are not useful for repair.
 
-Prefer `runtrail repo diff --stat-only` in public or semi-public workflows. Capture full patches only when the artifact stays within a trusted boundary.
+Prefer the default stat-only `runtrail repo diff` in public or semi-public workflows. Capture full patches with `runtrail repo diff --patch` only when the artifact stays within a trusted boundary.
 
 ## Handing the prompt to an agent
 
