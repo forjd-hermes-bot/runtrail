@@ -59,7 +59,7 @@ jobs:
       - name: Install runtrail
         run: |
           curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
-            | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
+            | RUNTRAIL_INSTALL_TAG=runtrail-v0.4.0 bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run tests with runtrail evidence

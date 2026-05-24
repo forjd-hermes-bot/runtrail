@@ -26,7 +26,7 @@ Install an immutable release tag from GitHub releases:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
-  | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
+  | RUNTRAIL_INSTALL_TAG=runtrail-v0.4.0 bash
 ```
 
 The installer detects OS/architecture, downloads the matching release asset, requires `SHA256SUMS` verification by default, and installs to `~/.local/bin`.
@@ -34,7 +34,7 @@ The installer detects OS/architecture, downloads the matching release asset, req
 Optional environment variables:
 
 ```bash
-RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash install.sh         # required release tag
+RUNTRAIL_INSTALL_TAG=runtrail-v0.4.0 bash install.sh         # required release tag
 RUNTRAIL_INSTALL_DIR=/usr/local/bin bash install.sh          # install directory
 RUNTRAIL_INSTALL_REPO=forjd/runtrail bash install.sh         # alternate repo
 RUNTRAIL_INSTALL_TAG=latest RUNTRAIL_INSTALL_ALLOW_LATEST=1 bash install.sh

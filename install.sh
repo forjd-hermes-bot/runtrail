@@ -26,7 +26,7 @@ usage() {
 Install runtrail.
 
 Environment variables:
-  RUNTRAIL_INSTALL_TAG            Required immutable release tag, e.g. runtrail-v0.3.0
+  RUNTRAIL_INSTALL_TAG            Required immutable release tag, e.g. runtrail-v0.4.0
   RUNTRAIL_INSTALL_REPO           GitHub repo, default: forjd/runtrail
   RUNTRAIL_INSTALL_DIR            Install directory, default: ~/.local/bin
   RUNTRAIL_INSTALL_ALLOW_LATEST=1 Allow the mutable latest release tag
@@ -34,7 +34,7 @@ Environment variables:
 
 Example:
   curl -fsSL https://raw.githubusercontent.com/forjd/runtrail/main/install.sh \
-    | RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0 bash
+    | RUNTRAIL_INSTALL_TAG=runtrail-v0.4.0 bash
 USAGE
 }
 
@@ -51,7 +51,7 @@ fi
 if [ -z "$TAG" ]; then
   cat >&2 <<'EOF'
 error: RUNTRAIL_INSTALL_TAG is required so installs are tied to an immutable release.
-Set RUNTRAIL_INSTALL_TAG=runtrail-v0.3.0, or set RUNTRAIL_INSTALL_ALLOW_LATEST=1 and RUNTRAIL_INSTALL_TAG=latest to opt into the moving latest release.
+Set RUNTRAIL_INSTALL_TAG=runtrail-v0.4.0, or set RUNTRAIL_INSTALL_ALLOW_LATEST=1 and RUNTRAIL_INSTALL_TAG=latest to opt into the moving latest release.
 EOF
   exit 1
 fi
