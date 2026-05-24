@@ -472,6 +472,102 @@ fn run_command_logs_start_and_end_events() {
 }
 
 #[test]
+fn run_command_logs_start_before_child_exits() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    let marker = dir.path().join("child-started");
+    let script = format!("printf started > '{}'; sleep 1", marker.display());
+    let mut child = std::process::Command::new(assert_cmd::cargo::cargo_bin("runtrail"))
+        .args([
+            "run",
+            "--file",
+            file.to_str().unwrap(),
+            "--cwd",
+            dir.path().to_str().unwrap(),
+            "--",
+            "sh",
+            "-c",
+            &script,
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+
+    for _ in 0..50 {
+        if marker.exists() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(marker.exists(), "child command did not start");
+    let raw = std::fs::read_to_string(&file).unwrap();
+    assert!(raw.contains("command.start"));
+    assert!(!raw.contains("command.end"));
+
+    let status = child.wait().unwrap();
+    assert!(status.success());
+}
+
+#[test]
+fn run_command_logs_spawn_failure_after_start() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args([
+            "run",
+            "--file",
+            file.to_str().unwrap(),
+            "--cwd",
+            dir.path().to_str().unwrap(),
+            "--",
+            "runtrail-definitely-missing-command",
+        ])
+        .assert()
+        .code(127);
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    let events: Vec<Value> = raw
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["event"], "command.start");
+    assert_eq!(events[1]["event"], "command.end");
+    assert_eq!(events[1]["body"]["success"], false);
+    assert_eq!(events[1]["body"]["exit_code"], 127);
+    assert!(events[1]["body"].get("spawn_error").is_some());
+}
+
+#[test]
+fn run_command_redacts_secret_argv_in_events_and_attrs() {
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("events.jsonl");
+    Command::cargo_bin("runtrail")
+        .unwrap()
+        .args([
+            "run",
+            "--file",
+            file.to_str().unwrap(),
+            "--cwd",
+            dir.path().to_str().unwrap(),
+            "--",
+            "sh",
+            "-c",
+            "printf ok",
+            "--token",
+            "SECRET123",
+        ])
+        .assert()
+        .success();
+
+    let raw = std::fs::read_to_string(file).unwrap();
+    assert!(!raw.contains("SECRET123"));
+    assert!(raw.contains("[REDACTED]"));
+}
+
+#[test]
 fn run_command_returns_child_exit_code_and_logs_error() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("events.jsonl");

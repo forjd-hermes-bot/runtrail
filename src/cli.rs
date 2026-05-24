@@ -4,7 +4,10 @@ use crate::diff::LogDiff;
 use crate::event::{Event, Level, NewEvent};
 use crate::git;
 use crate::index;
-use crate::log_io::{ValidationMode, append_event, next_seq, read_events, validate_file_with_mode};
+use crate::log_io::{
+    ValidationMode, append_event_with_next_seq, read_events, validate_file_with_mode,
+};
+use crate::redaction;
 use crate::repair;
 use crate::replay;
 use crate::summary::{Summary, format_level};
@@ -317,13 +320,10 @@ fn completions(args: CompletionsArgs) -> Result<()> {
 }
 
 fn log(args: LogArgs) -> Result<()> {
-    let seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     let attrs = parse_attrs(&args.attrs)?;
     let body = parse_body(args.body.as_deref(), args.message.as_deref())?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq,
         name: args.event,
         level: args.level.into(),
         src: Some(args.src),
@@ -338,7 +338,6 @@ fn log(args: LogArgs) -> Result<()> {
 
 struct AppendNewEvent<'a> {
     file: &'a Path,
-    seq: u64,
     name: String,
     level: Level,
     src: Option<String>,
@@ -352,19 +351,18 @@ struct AppendNewEvent<'a> {
 
 fn append_new_event(args: AppendNewEvent<'_>) -> Result<()> {
     let event = Event::new(NewEvent {
-        seq: args.seq,
+        seq: 1,
         event: args.name,
         level: args.level,
         src: args.src,
-        attrs: args.attrs,
-        body: args.body,
+        attrs: redaction::redact_map(args.attrs),
+        body: redaction::redact_value(args.body),
         trace_id: args.trace_id,
         span_id: args.span_id,
         parent_span_id: args.parent_span_id,
         duration_ms: args.duration_ms,
     });
-    event.validate().map_err(|message| anyhow!(message))?;
-    append_event(args.file, &event)?;
+    let event = append_event_with_next_seq(args.file, event)?;
     println!("{}", serde_json::to_string(&event)?);
     Ok(())
 }
@@ -465,12 +463,9 @@ fn repo(args: RepoArgs) -> Result<()> {
 }
 
 fn repo_snapshot(args: RepoSnapshotArgs) -> Result<()> {
-    let seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     let body = git::snapshot_body(&args.cwd)?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq,
         name: "repo.snapshot".to_string(),
         level: Level::Info,
         src: Some("git".to_string()),
@@ -484,12 +479,9 @@ fn repo_snapshot(args: RepoSnapshotArgs) -> Result<()> {
 }
 
 fn repo_diff(args: RepoDiffArgs) -> Result<()> {
-    let seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     let body = git::diff_body(&args.cwd, args.stat_only)?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq,
         name: "repo.diff".to_string(),
         level: Level::Info,
         src: Some("git".to_string()),
@@ -503,33 +495,35 @@ fn repo_diff(args: RepoDiffArgs) -> Result<()> {
 }
 
 fn run_command(args: RunArgs) -> Result<()> {
-    let start_seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
-    let result = command_run::run_command(&args.cwd, &args.command, args.preview_bytes)?;
     let mut attrs = Map::new();
-    attrs.insert("cmd".to_string(), Value::String(args.command.join(" ")));
+    attrs.insert(
+        "cmd".to_string(),
+        Value::String(redaction::redact_argv(&args.command).join(" ")),
+    );
     if !args.env_allowlist.is_empty() {
         attrs.insert(
             "env".to_string(),
             Value::Object(capture_env_allowlist(&args.env_allowlist)),
         );
     }
+
+    let start_body = command_run::start_body(&args.cwd, &args.command)?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq: start_seq,
         name: "command.start".to_string(),
         level: Level::Info,
         src: Some("runtrail".to_string()),
         attrs: attrs.clone(),
-        body: result.start_body,
+        body: start_body,
         trace_id: None,
         span_id: None,
         parent_span_id: None,
         duration_ms: None,
     })?;
+
+    let result = command_run::run_command(&args.cwd, &args.command, args.preview_bytes)?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq: start_seq + 1,
         name: "command.end".to_string(),
         level: if result.exit_code == 0 {
             Level::Info
@@ -552,11 +546,8 @@ fn run_command(args: RunArgs) -> Result<()> {
 }
 
 fn ci_capture(args: CiCaptureArgs) -> Result<()> {
-    let seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq,
         name: "ci.capture".to_string(),
         level: Level::Info,
         src: Some("runtrail".to_string()),
@@ -570,12 +561,9 @@ fn ci_capture(args: CiCaptureArgs) -> Result<()> {
 }
 
 fn github_context(args: CiGithubContextArgs) -> Result<()> {
-    let seq = next_seq(&args.file)
-        .with_context(|| format!("failed to inspect {}", args.file.display()))?;
     let attrs = capture_env_allowlist(GITHUB_ENV_ALLOWLIST);
     append_new_event(AppendNewEvent {
         file: &args.file,
-        seq,
         name: "ci.github.context".to_string(),
         level: Level::Info,
         src: Some("github-actions".to_string()),
