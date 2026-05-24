@@ -12,7 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -41,15 +41,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --target "${{ matrix.target }}"
+          rustup default stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
       - name: Install cross linker for Linux ARM64
         if: matrix.cross == true
@@ -87,8 +88,25 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/runtrail.exe" dist/runtrail.exe
           Compress-Archive -Path dist/runtrail.exe -DestinationPath "${{ matrix.artifact }}" -Force
 
+      - name: Smoke packaged Unix binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          tar -xzf "${{ matrix.artifact }}" -C smoke
+          ./smoke/runtrail --version
+
+      - name: Smoke packaged Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path smoke
+          Expand-Archive -Path "${{ matrix.artifact }}" -DestinationPath smoke -Force
+          ./smoke/runtrail.exe --version
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
@@ -98,10 +116,12 @@ jobs:
     name: Publish binaries
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.ref, '-v') || inputs.publish_tag != ''
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.ref, '-v') || (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '')
+    permissions:
+      contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
@@ -109,37 +129,54 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum * > SHA256SUMS
+          for file in ./*; do
+            [ -f "$file" ] || continue
+            sha256sum -- "$file" | sed 's# \./# #'
+          done > SHA256SUMS
 
       - name: Resolve release metadata
         id: meta
         shell: bash
+        env:
+          PUBLISH_TAG: ${{ inputs.publish_tag }}
         run: |
           set -euo pipefail
-          if [[ -n "${{ inputs.publish_tag }}" ]]; then
-            tag="${{ inputs.publish_tag }}"
-            echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
-            echo "name=${tag}" >> "$GITHUB_OUTPUT"
-            echo "body=Release binaries for ${tag}." >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+          validate_tag() {
+            local tag="$1"
+            if [[ ! "$tag" =~ ^[A-Za-z0-9._-]*v[0-9][A-Za-z0-9._-]*$ ]]; then
+              echo "Invalid release tag: $tag" >&2
+              exit 1
+            fi
+          }
+          write_metadata() {
+            local tag="$1"
+            local name="$2"
+            local body="$3"
+            local prerelease="$4"
+            local make_latest="$5"
+            {
+              echo "tag_name=${tag}"
+              echo "name=${name}"
+              echo "body=${body}"
+              echo "prerelease=${prerelease}"
+              echo "make_latest=${make_latest}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          if [[ -n "${PUBLISH_TAG}" ]]; then
+            tag="${PUBLISH_TAG}"
+            validate_tag "$tag"
+            write_metadata "$tag" "$tag" "Release binaries for ${tag}." false true
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             tag="${GITHUB_REF_NAME}"
-            echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
-            echo "name=${tag}" >> "$GITHUB_OUTPUT"
-            echo "body=Release binaries for ${tag}." >> "$GITHUB_OUTPUT"
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+            validate_tag "$tag"
+            write_metadata "$tag" "$tag" "Release binaries for ${tag}." false true
           else
-            echo "tag_name=latest" >> "$GITHUB_OUTPUT"
-            echo "name=Latest main build" >> "$GITHUB_OUTPUT"
-            echo "body=Automated binaries built from main. This moving release is used by install.sh by default." >> "$GITHUB_OUTPUT"
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+            write_metadata latest "Latest main build" "Automated binaries built from main. This moving release is not the installer default." true false
           fi
 
       - name: Publish release binaries
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.meta.outputs.tag_name }}
           name: ${{ steps.meta.outputs.name }}
