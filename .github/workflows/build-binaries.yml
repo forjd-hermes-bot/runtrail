@@ -89,13 +89,20 @@ jobs:
           Compress-Archive -Path dist/runtrail.exe -DestinationPath "${{ matrix.artifact }}" -Force
 
       - name: Smoke packaged Unix binary
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.cross != true
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p smoke
           tar -xzf "${{ matrix.artifact }}" -C smoke
           ./smoke/runtrail --version
+
+      - name: Inspect cross-packaged Unix binary
+        if: runner.os != 'Windows' && matrix.cross == true
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -tzf "${{ matrix.artifact }}" | grep -Fx runtrail
 
       - name: Smoke packaged Windows binary
         if: runner.os == 'Windows'
